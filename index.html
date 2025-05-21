@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Route Algorithm Visualizer</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background-color: #f3f4f6;
+      }
+
+      .map-container {
+        position: relative; /* For positioning search overlay */
+        height: 60vh;
+        width: 100%;
+        margin-bottom: 1rem;
+      }
+      #map {
+        height: 100%;
+        width: 100%;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+      .leaflet-container {
+        background: #e5e7eb;
+      }
+
+      /* Search Overlay Styles */
+      #searchOverlay {
+        position: absolute;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000; /* Above map, below popups if any */
+        width: 90%;
+        max-width: 500px;
+      }
+      #locationSearchInputContainer {
+        display: flex;
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        overflow: hidden; /* Ensures child corners are also rounded */
+      }
+      #locationSearchInput {
+        flex-grow: 1;
+        border: none;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        outline: none;
+      }
+      #searchLocationBtn {
+        /* Optional: if you want a button next to input */
+        padding: 0.75rem 1rem;
+        background-color: #3b82f6;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      #searchSuggestions {
+        list-style: none;
+        padding: 0;
+        margin: 0.5rem 0 0 0;
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      #searchSuggestions li {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      #searchSuggestions li:last-child {
+        border-bottom: none;
+      }
+      #searchSuggestions li:hover {
+        background-color: #f3f4f6;
+      }
+      /* End Search Overlay Styles */
+
+      .controls-container {
+        padding: 1rem;
+        background-color: #f9fafb;
+        border-top: 1px solid #e5e7eb;
+        overflow-y: auto;
+        flex-grow: 1;
+      }
+
+      .control-card {
+        background-color: white;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        margin-bottom: 1rem;
+      }
+
+      .btn {
+        padding: 0.625rem 1.25rem;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        margin: 0.25rem;
+        border: 1px solid transparent;
+        text-align: center;
+      }
+      .btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+      }
+
+      .btn-primary {
+        background-color: #3b82f6;
+        color: white;
+      }
+      .btn-primary:hover {
+        background-color: #2563eb;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .btn-secondary {
+        background-color: #10b981;
+        color: white;
+      }
+      .btn-secondary:hover {
+        background-color: #059669;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      /* .btn-info class removed as search button is integrated or can be styled within searchOverlay */
+
+      .btn-danger {
+        background-color: #ef4444;
+        color: white;
+      }
+      .btn-danger:hover {
+        background-color: #dc2626;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .btn-outline {
+        border-color: #d1d5db;
+        color: #374151;
+        background-color: white;
+      }
+      .btn-outline:hover {
+        background-color: #f3f4f6;
+        border-color: #9ca3af;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .btn-remove-point {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 0.25rem;
+        margin-left: 0.5rem;
+      }
+      .btn-remove-point:hover {
+        background-color: #fecaca;
+        color: #991b1b;
+      }
+
+      select {
+        /* Select specific styling */
+        padding: 0.625rem;
+        border-radius: 0.5rem;
+        border: 1px solid #d1d5db;
+        margin: 0.25rem 0;
+        width: 100%;
+        box-sizing: border-box;
+        background-color: white; /* Ensure select background is white */
+      }
+      select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        outline: none;
+      }
+
+      .result-item {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+        background-color: #f9fafb;
+        display: flex;
+        align-items: center;
+      }
+      .color-box {
+        display: inline-block;
+        width: 1.25em;
+        height: 1.25em;
+        margin-right: 0.75em;
+        vertical-align: middle;
+        border: 1px solid #d1d5db;
+        border-radius: 0.25rem;
+      }
+      #messageBox {
+        position: fixed;
+        top: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.875rem 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+          0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        z-index: 10001; /* Above search overlay */
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(-20px);
+      }
+      #messageBox.show {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+      }
+      .leaflet-routing-container {
+        max-height: 150px;
+        overflow-y: auto;
+        border-radius: 0.375rem;
+        border: 1px solid #e5e7eb;
+      }
+      .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        color: #1f2937;
+      }
+      .subsection-title {
+        font-size: 1rem;
+        font-weight: 500;
+        margin-top: 1rem;
+        margin-bottom: 0.25rem;
+        color: #4b5563;
+      }
+      .points-list-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.25rem 0;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100">
+    <div id="messageBox"></div>
+
+    <div class="map-container m-4">
+      <div id="map"></div>
+      <div id="searchOverlay">
+        <div id="locationSearchInputContainer">
+          <input
+            type="text"
+            id="locationSearchInput"
+            placeholder="Search city or place..."
+            class="w-full"
+          />
+        </div>
+        <ul id="searchSuggestions" class="hidden"></ul>
+      </div>
+    </div>
+
+    <div class="controls-container">
+      <div
+        class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
+
+        <div class="control-card">
+          <h2 class="section-title">1. Manage Points</h2>
+          <button id="addPointMode" class="btn btn-primary w-full mb-3">
+            Mode: Add Points
+          </button>
+          <button id="resetPoints" class="btn btn-danger w-full mb-3">
+            Clear All Points & Paths
+          </button>
+          <div class="mt-2 text-sm text-gray-600">
+            <p>
+              Click map to add points. Paths will follow sequence between
+              Start/End.
+            </p>
+            <p class="mt-1">
+              Current mode:
+              <span id="currentModeDisplay" class="font-semibold text-gray-700"
+                >Add Points</span
+              >
+            </p>
+          </div>
+          <div class="mt-5">
+            <h3 class="subsection-title mb-2">Placed Points:</h3>
+            <ul
+              id="pointsList"
+              class="text-sm text-gray-700 max-h-40 overflow-y-auto space-y-1 pr-2"
+            ></ul>
+          </div>
+        </div>
+
+        <div class="control-card">
+          <h2 class="section-title">2. Pathfinding (Sequential)</h2>
+          <div class="mb-4">
+            <label
+              for="startNodeSelect"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >Start Point for Sequence:</label
+            >
+            <select id="startNodeSelect" class="w-full"></select>
+          </div>
+          <div class="mb-4">
+            <label
+              for="endNodeSelect"
+              class="block text-sm font-medium text-gray-700 mb-1"
+              >End Point for Sequence:</label
+            >
+            <select id="endNodeSelect" class="w-full"></select>
+          </div>
+          <h3 class="subsection-title">
+            Abstract Graph Algorithms
+            <span class="text-xs text-gray-500"
+              >(Straight Lines per Segment)</span
+            >:
+          </h3>
+          <button id="runDFS" class="btn btn-outline w-full mb-2">
+            Run DFS (Sequential)
+          </button>
+          <button id="runBFS" class="btn btn-outline w-full mb-2">
+            Run BFS (Sequential)
+          </button>
+          <button id="runAStar" class="btn btn-outline w-full mb-2">
+            Run A* (Sequential)
+          </button>
+          <button id="runDAGSP" class="btn btn-outline w-full">
+            Run DAG Shortest Path
+          </button>
+
+          <h3 class="subsection-title mt-5">
+            Road Network Algorithm
+            <span class="text-xs text-gray-500">(Sequential)</span>:
+          </h3>
+          <button id="runRoadRoute" class="btn btn-secondary w-full">
+            Find Road Route (Sequential)
+          </button>
+        </div>
+
+        <div class="control-card">
+          <h2 class="section-title">
+            3. Minimum Spanning Tree
+            <span class="text-xs text-gray-500">(All Points)</span>
+          </h2>
+          <button id="runPrims" class="btn btn-outline w-full mb-2">
+            Run Prim's Algorithm
+          </button>
+          <button id="runKruskals" class="btn btn-outline w-full mb-4">
+            Run Kruskal's Algorithm
+          </button>
+
+          <h2 class="section-title mt-5">Results & Comparison</h2>
+          <div id="resultsDisplay" class="text-sm space-y-3"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- Global Variables ---
+      let map;
+      let nodes = [];
+      let drawnPathLayers = L.featureGroup();
+      let currentMode = "addPoint";
+      let nextNodeId = 1;
+      let lrmControl = null;
+      const messageBox = document.getElementById("messageBox");
+      let searchTimeout = null; // For debouncing search input
+
+      const algorithmColors = {
+        DFS: "#ef4444",
+        BFS: "#3b82f6",
+        ASTAR: "#22c55e",
+        DAG_SP: "#ec4899",
+        PRIMS: "#f97316",
+        KRUSKALS: "#8b5cf6",
+        ROAD_ROUTE: "#14b8a6",
+      };
+
+      // --- Map Initialization ---
+      function initMap() {
+        map = L.map("map").setView([-7.2575, 112.7521], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
+        drawnPathLayers.addTo(map);
+        map.on("click", handleMapClick);
+        // Hide suggestions when clicking outside search area
+        map.on("click", () =>
+          document.getElementById("searchSuggestions").classList.add("hidden")
+        );
+      }
+
+      // --- UI Element Getters ---
+      const locationSearchInput = document.getElementById(
+        "locationSearchInput"
+      );
+      const searchSuggestionsList =
+        document.getElementById("searchSuggestions");
+      // const searchLocationBtn = document.getElementById('searchLocationBtn'); // No longer a separate button by default
+      const addPointModeBtn = document.getElementById("addPointMode");
+      const resetPointsBtn = document.getElementById("resetPoints");
+      const currentModeDisplay = document.getElementById("currentModeDisplay");
+      const startNodeSelect = document.getElementById("startNodeSelect");
+      const endNodeSelect = document.getElementById("endNodeSelect");
+      const pointsListUI = document.getElementById("pointsList");
+      const resultsDisplay = document.getElementById("resultsDisplay");
+
+      // --- Event Listeners ---
+      locationSearchInput.addEventListener("input", handleSearchInput);
+      locationSearchInput.addEventListener("focus", () => {
+        // Show suggestions if there's text, could be improved
+        if (locationSearchInput.value.trim().length > 2)
+          fetchSearchSuggestions();
+      });
+      searchSuggestionsList.addEventListener("click", handleSuggestionClick);
+      // Hide suggestions when focus leaves the entire search overlay (input + suggestions)
+      document
+        .getElementById("searchOverlay")
+        .addEventListener("focusout", (e) => {
+          if (
+            !document.getElementById("searchOverlay").contains(e.relatedTarget)
+          ) {
+            searchSuggestionsList.classList.add("hidden");
+          }
+        });
+
+      addPointModeBtn.addEventListener("click", () => {
+        currentMode = "addPoint";
+        updateModeDisplay();
+      });
+      resetPointsBtn.addEventListener("click", resetAll);
+      document
+        .getElementById("runDFS")
+        .addEventListener("click", () => runPathfindingSequential("DFS"));
+      document
+        .getElementById("runBFS")
+        .addEventListener("click", () => runPathfindingSequential("BFS"));
+      document
+        .getElementById("runAStar")
+        .addEventListener("click", () => runPathfindingSequential("ASTAR"));
+      document
+        .getElementById("runDAGSP")
+        .addEventListener("click", () => runPathfindingSequential("DAG_SP"));
+      document
+        .getElementById("runRoadRoute")
+        .addEventListener("click", runRoadRouteSequential);
+      document
+        .getElementById("runPrims")
+        .addEventListener("click", () => runMST("PRIMS"));
+      document
+        .getElementById("runKruskals")
+        .addEventListener("click", () => runMST("KRUSKALS"));
+      pointsListUI.addEventListener("click", handlePointListActions);
+
+      // --- Location Search with Autocomplete ---
+      function handleSearchInput() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          fetchSearchSuggestions();
+        }, 300); // Debounce for 300ms
+      }
+
+      async function fetchSearchSuggestions() {
+        const query = locationSearchInput.value.trim();
+        if (query.length < 3) {
+          // Minimum characters to trigger search
+          searchSuggestionsList.innerHTML = "";
+          searchSuggestionsList.classList.add("hidden");
+          return;
+        }
+        // showMessage("Searching suggestions...", "info", 1000); // Can be noisy
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+              query
+            )}&limit=5`
+          ); // Limit to 5 suggestions
+          if (!response.ok) {
+            throw new Error(`Nominatim API error: ${response.statusText}`);
+          }
+          const data = await response.json();
+          displaySearchSuggestions(data);
+        } catch (error) {
+          console.error("Error fetching suggestions:", error);
+          showMessage("Error fetching suggestions.", "error");
+          searchSuggestionsList.innerHTML = "";
+          searchSuggestionsList.classList.add("hidden");
+        }
+      }
+
+      function displaySearchSuggestions(suggestions) {
+        searchSuggestionsList.innerHTML = "";
+        if (suggestions && suggestions.length > 0) {
+          suggestions.forEach((place) => {
+            const li = document.createElement("li");
+            li.textContent = place.display_name;
+            li.dataset.lat = place.lat;
+            li.dataset.lon = place.lon;
+            li.dataset.boundingbox = JSON.stringify(place.boundingbox); // Store bounding box
+            searchSuggestionsList.appendChild(li);
+          });
+          searchSuggestionsList.classList.remove("hidden");
+        } else {
+          searchSuggestionsList.classList.add("hidden");
+        }
+      }
+
+      function handleSuggestionClick(event) {
+        if (event.target.tagName === "LI") {
+          const targetLi = event.target;
+          const lat = parseFloat(targetLi.dataset.lat);
+          const lon = parseFloat(targetLi.dataset.lon);
+          const boundingbox = JSON.parse(targetLi.dataset.boundingbox);
+
+          const bounds = [
+            [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])], // Southwest
+            [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])], // Northeast
+          ];
+          map.fitBounds(bounds);
+
+          showMessage(`Navigated to: ${targetLi.textContent}`, "success");
+          locationSearchInput.value = ""; // Clear input
+          searchSuggestionsList.innerHTML = ""; // Clear suggestions
+          searchSuggestionsList.classList.add("hidden");
+        }
+      }
+
+      // --- Message Display ---
+      function showMessage(message, type = "info", duration = 3000) {
+        messageBox.textContent = message;
+        messageBox.style.backgroundColor =
+          type === "error"
+            ? "#ef4444"
+            : type === "success"
+            ? "#22c55e"
+            : type === "info"
+            ? "#3b82f6"
+            : "#6b7280";
+        messageBox.style.color = "white";
+        messageBox.classList.add("show");
+        setTimeout(() => messageBox.classList.remove("show"), duration);
+      }
+
+      // --- Mode & Point Management ---
+      function updateModeDisplay() {
+        currentModeDisplay.textContent =
+          currentMode === "addPoint" ? "Add Points" : "N/A";
+      }
+
+      function handleMapClick(e) {
+        // Prevent adding point if click was on search overlay elements
+        if (
+          document
+            .getElementById("searchOverlay")
+            .contains(e.originalEvent.target)
+        ) {
+          return;
+        }
+
+        if (currentMode === "addPoint") {
+          const nodeId = nextNodeId++;
+          const nodeName = `P${nodeId}`;
+          const marker = L.marker(e.latlng, { draggable: false })
+            .addTo(map)
+            .bindPopup(
+              `Point ${nodeName} (${e.latlng.lat.toFixed(
+                4
+              )}, ${e.latlng.lng.toFixed(4)})`
+            )
+            .openPopup();
+          nodes.push({
+            id: nodeId,
+            name: nodeName,
+            lat: e.latlng.lat,
+            lng: e.latlng.lng,
+            marker: marker,
+            originalIndex: nodes.length,
+          });
+          updatePointSelectors();
+          updatePointsListUI();
+          clearAllDrawnPathsAndResults();
+        }
+      }
+      function resetAll() {
+        nodes.forEach((node) => map.removeLayer(node.marker));
+        nodes = [];
+        nextNodeId = 1;
+        clearAllDrawnPathsAndResults();
+        updatePointSelectors();
+        updatePointsListUI();
+        currentMode = "addPoint";
+        updateModeDisplay();
+        locationSearchInput.value = ""; // Clear search input on reset
+        searchSuggestionsList.innerHTML = "";
+        searchSuggestionsList.classList.add("hidden");
+        showMessage("Map and points cleared.", "info");
+      }
+      // (All point management functions like updatePointSelectors, updatePointsListUI, etc. are unchanged from previous version)
+      function updatePointSelectors() {
+        const currentStartVal = startNodeSelect.value;
+        const currentEndVal = endNodeSelect.value;
+        startNodeSelect.innerHTML = "";
+        endNodeSelect.innerHTML = "";
+        nodes.forEach((node) => {
+          const optionStart = document.createElement("option");
+          optionStart.value = node.id;
+          optionStart.textContent = node.name;
+          startNodeSelect.appendChild(optionStart);
+          const optionEnd = document.createElement("option");
+          optionEnd.value = node.id;
+          optionEnd.textContent = node.name;
+          endNodeSelect.appendChild(optionEnd);
+        });
+        if (nodes.find((n) => n.id === parseInt(currentStartVal)))
+          startNodeSelect.value = currentStartVal;
+        if (nodes.find((n) => n.id === parseInt(currentEndVal)))
+          endNodeSelect.value = currentEndVal;
+        else if (nodes.length > 0)
+          endNodeSelect.value = nodes[nodes.length - 1].id;
+      }
+      function updatePointsListUI() {
+        pointsListUI.innerHTML =
+          nodes.length === 0
+            ? '<li class="text-gray-500">No points added yet.</li>'
+            : nodes
+                .map(
+                  (n) => `
+                    <li class="points-list-item" data-node-id="${n.id}">
+                        <span>${n.name}: (${n.lat.toFixed(3)}, ${n.lng.toFixed(
+                    3
+                  )})</span>
+                        <button class="btn-remove-point" data-remove-id="${
+                          n.id
+                        }" title="Remove ${n.name}">×</button>
+                    </li>
+                `
+                )
+                .join("");
+      }
+      function handlePointListActions(event) {
+        if (event.target.matches("[data-remove-id]")) {
+          const nodeIdToRemove = parseInt(event.target.dataset.removeId);
+          removePoint(nodeIdToRemove);
+        }
+      }
+      function removePoint(nodeId) {
+        const nodeIndex = nodes.findIndex((n) => n.id === nodeId);
+        if (nodeIndex === -1) return;
+        const nodeToRemove = nodes[nodeIndex];
+        map.removeLayer(nodeToRemove.marker);
+        nodes.splice(nodeIndex, 1);
+        nodes.forEach((node, index) => (node.originalIndex = index));
+        updatePointSelectors();
+        updatePointsListUI();
+        clearAllDrawnPathsAndResults();
+        showMessage(`Point ${nodeToRemove.name} removed.`, "info", 2000);
+      }
+      function clearAllDrawnPathsAndResults() {
+        drawnPathLayers.clearLayers();
+        if (lrmControl) {
+          map.removeControl(lrmControl);
+          lrmControl = null;
+        }
+        resultsDisplay.innerHTML = "";
+      }
+
+      // --- Helper: Get Node Sequence for Pathfinding ---
+      function getNodeSequence() {
+        if (nodes.length === 0) {
+          showMessage(
+            "Please add at least two points to define a sequence.",
+            "error"
+          );
+          return null;
+        }
+        if (nodes.length === 1) {
+          showMessage(
+            "Only one point exists. Add more to define a sequence path.",
+            "info"
+          );
+          return [nodes[0]];
+        }
+        const startId = parseInt(startNodeSelect.value);
+        const endId = parseInt(endNodeSelect.value);
+        if (isNaN(startId) || isNaN(endId)) {
+          showMessage(
+            "Please select valid start and end points for the sequence.",
+            "error"
+          );
+          return null;
+        }
+        const startIndex = nodes.findIndex((n) => n.id === startId);
+        const endIndex = nodes.findIndex((n) => n.id === endId);
+        if (startIndex === -1 || endIndex === -1) {
+          showMessage("Selected start or end node not found.", "error");
+          return null;
+        }
+        if (startIndex > endIndex) {
+          showMessage(
+            "Start point must come before or be the same as end point in placement order for sequence processing.",
+            "error"
+          );
+          return null;
+        }
+        const sequence = nodes.slice(startIndex, endIndex + 1);
+        if (sequence.length === 1 && startId === endId) {
+          showMessage(
+            "Start and end points are the same. No path to calculate between them.",
+            "info"
+          );
+          return [nodes[startIndex]];
+        }
+        if (sequence.length < 2) {
+          showMessage(
+            "Sequence requires at least two distinct points for a path.",
+            "info"
+          );
+          return null;
+        }
+        return sequence;
+      }
+
+      // --- Distance & Graph Building ---
+      function getDistance(node1, node2) {
+        const latLng1 = L.latLng(node1.lat, node1.lng);
+        const latLng2 = L.latLng(node2.lat, node2.lng);
+        return latLng1.distanceTo(latLng2);
+      }
+      function getHeuristicDistance(node1, node2) {
+        return getDistance(node1, node2);
+      }
+      function buildUndirectedGraphFromAllNodes() {
+        const adjList = {};
+        nodes.forEach((node) => (adjList[node.id] = []));
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const node1 = nodes[i];
+            const node2 = nodes[j];
+            const distance = getDistance(node1, node2);
+            adjList[node1.id].push({ neighborId: node2.id, weight: distance });
+            adjList[node2.id].push({ neighborId: node1.id, weight: distance });
+          }
+        }
+        return adjList;
+      }
+      function buildDirectedAcyclicGraphFromAllNodes() {
+        const adj = {};
+        const inDegree = {};
+        const nodeIds = new Set();
+        nodes.forEach((node) => {
+          adj[node.id] = [];
+          inDegree[node.id] = 0;
+          nodeIds.add(node.id);
+        });
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const node1 = nodes[i];
+            const node2 = nodes[j];
+            const distance = getDistance(node1, node2);
+            adj[node1.id].push({ neighborId: node2.id, weight: distance });
+            inDegree[node2.id]++;
+          }
+        }
+        return { adj, inDegree, nodeIds };
+      }
+
+      // --- Path Drawing (Straight Lines) ---
+      function drawPathSegment(pathNodeIds, color) {
+        if (!pathNodeIds || pathNodeIds.length < 2) return 0;
+        const latLngs = pathNodeIds.map((id) => {
+          const node = nodes.find((n) => n.id === id);
+          return [node.lat, node.lng];
+        });
+        L.polyline(latLngs, {
+          color: color,
+          weight: 5,
+          opacity: 0.75,
+          dashArray: "1,0",
+        }).addTo(drawnPathLayers);
+        let segmentLength = 0;
+        for (let i = 0; i < pathNodeIds.length - 1; i++) {
+          segmentLength += getDistance(
+            nodes.find((n) => n.id === pathNodeIds[i]),
+            nodes.find((n) => n.id === pathNodeIds[i + 1])
+          );
+        }
+        return segmentLength;
+      }
+      function drawMST(mstEdges, color) {
+        if (!mstEdges || mstEdges.length === 0) return 0;
+        let totalWeight = 0;
+        mstEdges.forEach((edge) => {
+          const nodeFrom = nodes.find((n) => n.id === edge.from);
+          const nodeTo = nodes.find((n) => n.id === edge.to);
+          if (nodeFrom && nodeTo) {
+            L.polyline(
+              [
+                [nodeFrom.lat, nodeFrom.lng],
+                [nodeTo.lat, nodeTo.lng],
+              ],
+              { color: color, weight: 4, opacity: 0.7, dashArray: "5, 5" }
+            ).addTo(drawnPathLayers);
+            totalWeight += edge.weight;
+          }
+        });
+        return totalWeight;
+      }
+
+      // --- Result Display ---
+      function displayResult(
+        algorithmName,
+        metricValue,
+        unit = "m",
+        isPath = true
+      ) {
+        const resultId = `result-${algorithmName}`;
+        let resultItem = document.getElementById(resultId);
+        if (!resultItem) {
+          resultItem = document.createElement("div");
+          resultItem.id = resultId;
+          resultItem.classList.add("result-item");
+          resultsDisplay.appendChild(resultItem);
+        }
+        const colorBoxHTML = `<span class="color-box" style="background-color:${algorithmColors[algorithmName]};"></span>`;
+        const metricType = isPath ? "Total Path Length" : "MST Total Weight";
+        let metricDisplay = (metricValue / 1000).toFixed(2) + " km";
+        if (metricValue === 0 && isPath && algorithmName !== "ROAD_ROUTE") {
+          metricDisplay += " (No path or start=end)";
+        } else if (metricValue === 0 && !isPath) {
+          metricDisplay += " (No MST formed)";
+        } else if (
+          metricValue === 0 &&
+          isPath &&
+          algorithmName === "ROAD_ROUTE" &&
+          nodes.length > 1 &&
+          startNodeSelect.value !== endNodeSelect.value
+        ) {
+          metricDisplay += " (Route not found or 0km)";
+        }
+        resultItem.innerHTML = `${colorBoxHTML}<div><strong>${algorithmName.replace(
+          /_/g,
+          " "
+        )}</strong>: <span class="text-gray-600">${metricType}: ${metricDisplay}</span></div>`;
+      }
+
+      // --- Pathfinding Sequential ---
+      function runPathfindingSequential(algorithm) {
+        const sequence = getNodeSequence();
+        if (!sequence || sequence.length < 2) {
+          if (
+            sequence &&
+            sequence.length === 1 &&
+            sequence[0].id === parseInt(startNodeSelect.value) &&
+            sequence[0].id === parseInt(endNodeSelect.value)
+          ) {
+            clearPathsByAlgorithm(algorithm);
+            displayResult(algorithm, 0, "m", true);
+          }
+          return;
+        }
+
+        clearPathsByAlgorithm(algorithm);
+        let graph, dagData, globalTopoOrder;
+
+        if (algorithm === "DAG_SP") {
+          dagData = buildDirectedAcyclicGraphFromAllNodes();
+          graph = dagData.adj;
+          globalTopoOrder = topologicalSort(
+            dagData.adj,
+            dagData.inDegree,
+            dagData.nodeIds
+          );
+          if (!globalTopoOrder) {
+            showMessage(
+              "Cannot run DAG algorithm: Graph contains a cycle or is invalid for topological sort.",
+              "error"
+            );
+            displayResult(algorithm, 0, "m", true);
+            return;
+          }
+        } else {
+          graph = buildUndirectedGraphFromAllNodes();
+        }
+
+        let totalPathLength = 0;
+        let allSegmentsFound = true;
+
+        for (let i = 0; i < sequence.length - 1; i++) {
+          const segmentStartId = sequence[i].id;
+          const segmentEndId = sequence[i + 1].id;
+          let segmentPath = null;
+
+          if (segmentStartId === segmentEndId) continue;
+
+          switch (algorithm) {
+            case "DFS":
+              segmentPath = dfs(graph, segmentStartId, segmentEndId);
+              break;
+            case "BFS":
+              segmentPath = bfs(graph, segmentStartId, segmentEndId);
+              break;
+            case "ASTAR":
+              segmentPath = aStar(graph, segmentStartId, segmentEndId);
+              break;
+            case "DAG_SP":
+              segmentPath = dagShortestPathAlgorithm(
+                graph,
+                globalTopoOrder,
+                segmentStartId,
+                segmentEndId,
+                dagData.nodeIds
+              );
+              break;
+          }
+
+          if (segmentPath) {
+            totalPathLength += drawPathSegment(
+              segmentPath,
+              algorithmColors[algorithm]
+            );
+          } else {
+            allSegmentsFound = false;
+            console.warn(
+              `${algorithm}: No path for segment P${segmentStartId}-P${segmentEndId}.`
+            );
+            showMessage(
+              `${algorithm}: No path for P${segmentStartId}-P${segmentEndId}.`,
+              "error",
+              2000 + i * 500
+            );
+          }
+        }
+
+        if (!allSegmentsFound && totalPathLength === 0 && sequence.length > 1) {
+          showMessage(
+            `${algorithm}: Could not complete the full sequential path.`,
+            "error"
+          );
+        } else if (
+          allSegmentsFound &&
+          sequence.length > 1 &&
+          totalPathLength > 0
+        ) {
+          showMessage(
+            `${algorithm}: Sequential path calculated.`,
+            "success",
+            2000
+          );
+        } else if (
+          sequence.length > 1 &&
+          totalPathLength === 0 &&
+          allSegmentsFound
+        ) {
+          showMessage(
+            `${algorithm}: Path calculated, but total length is 0km.`,
+            "info"
+          );
+        }
+        displayResult(algorithm, totalPathLength, "m", true);
+      }
+
+      // --- Road Route Finding Sequential ---
+      function runRoadRouteSequential() {
+        const sequence = getNodeSequence();
+        if (
+          !sequence ||
+          sequence.length < 2 ||
+          (sequence.length === 1 &&
+            sequence[0].id === parseInt(startNodeSelect.value) &&
+            sequence[0].id === parseInt(endNodeSelect.value))
+        ) {
+          if (sequence && sequence.length === 1) {
+            clearPathsByAlgorithm("ROAD_ROUTE");
+            displayResult("ROAD_ROUTE", 0, "m", true);
+          }
+          return;
+        }
+        clearPathsByAlgorithm("ROAD_ROUTE");
+        const waypoints = sequence.map((node) => L.latLng(node.lat, node.lng));
+        lrmControl = L.Routing.control({
+          waypoints: waypoints,
+          routeWhileDragging: false,
+          show: true,
+          addWaypoints: false,
+          lineOptions: {
+            styles: [
+              { color: algorithmColors.ROAD_ROUTE, opacity: 0.8, weight: 7 },
+            ],
+          },
+          createMarker: function () {
+            return null;
+          },
+        })
+          .on("routesfound", function (e) {
+            if (e.routes && e.routes.length > 0 && e.routes[0].summary) {
+              displayResult(
+                "ROAD_ROUTE",
+                e.routes[0].summary.totalDistance,
+                "m",
+                true
+              );
+              showMessage("Sequential road route found!", "success", 2000);
+            } else {
+              showMessage(
+                "Road route found but no distance summary or invalid route.",
+                "info"
+              );
+              displayResult("ROAD_ROUTE", 0, "m", true);
+            }
+          })
+          .on("routingerror", function (e) {
+            console.error("Routing error:", e.error);
+            showMessage(
+              `Road routing error: ${
+                e.error.message || "Could not find route."
+              }`,
+              "error"
+            );
+            displayResult("ROAD_ROUTE", 0, "m", true);
+          })
+          .addTo(map);
+      }
+
+      
+      // (All algorithm implementations and helpers are unchanged from previous correct version)
+      function dfs(graph, startId, endId) {
+        const visited = new Set();
+        const stack = [[startId, [startId]]];
+        while (stack.length > 0) {
+          const [currentId, path] = stack.pop();
+          if (currentId === endId) return path;
+          if (!visited.has(currentId)) {
+            visited.add(currentId);
+            const neighbors = graph[currentId] || [];
+            for (let i = neighbors.length - 1; i >= 0; i--) {
+              const n = neighbors[i];
+              if (!visited.has(n.neighborId))
+                stack.push([n.neighborId, [...path, n.neighborId]]);
+            }
+          }
+        }
+        return null;
+      }
+      function bfs(graph, startId, endId) {
+        const visited = new Set();
+        const queue = [[startId, [startId]]];
+        visited.add(startId);
+        while (queue.length > 0) {
+          const [currentId, path] = queue.shift();
+          if (currentId === endId) return path;
+          const neighbors = graph[currentId] || [];
+          for (const n of neighbors) {
+            if (!visited.has(n.neighborId)) {
+              visited.add(n.neighborId);
+              queue.push([n.neighborId, [...path, n.neighborId]]);
+            }
+          }
+        }
+        return null;
+      }
+      function aStar(graph, startId, endId) {
+        const openSet = new PriorityQueue();
+        openSet.enqueue(startId, 0);
+        const cameFrom = {};
+        const gScore = {};
+        nodes.forEach((n) => (gScore[n.id] = Infinity));
+        gScore[startId] = 0;
+        const fScore = {};
+        nodes.forEach((n) => (fScore[n.id] = Infinity));
+        const sNode = nodes.find((n) => n.id === startId);
+        const eNode = nodes.find((n) => n.id === endId);
+        if (!sNode || !eNode) return null;
+        fScore[startId] = getHeuristicDistance(sNode, eNode);
+        while (!openSet.isEmpty()) {
+          const currentId = openSet.dequeue().element;
+          if (currentId === endId) return reconstructPath(cameFrom, currentId);
+          const neighbors = (graph[currentId] || [])
+            .slice()
+            .sort((a, b) => a.weight - b.weight);
+          for (const edge of neighbors) {
+            const neighborId = edge.neighborId;
+            const tentative_gScore = gScore[currentId] + edge.weight;
+            if (tentative_gScore < gScore[neighborId]) {
+              cameFrom[neighborId] = currentId;
+              gScore[neighborId] = tentative_gScore;
+              const neighNode = nodes.find((n) => n.id === neighborId);
+              if (!neighNode) continue;
+              fScore[neighborId] =
+                gScore[neighborId] + getHeuristicDistance(neighNode, eNode);
+              if (!openSet.contains(neighborId))
+                openSet.enqueue(neighborId, fScore[neighborId]);
+              else openSet.updatePriority(neighborId, fScore[neighborId]);
+            }
+          }
+        }
+        return null;
+      }
+      function reconstructPath(cameFrom, currentId) {
+        const totalPath = [currentId];
+        while (cameFrom[currentId]) {
+          currentId = cameFrom[currentId];
+          totalPath.unshift(currentId);
+        }
+        return totalPath;
+      }
+      function topologicalSort(adj, inDegree, nodeIdsSet) {
+        const q = [];
+        const localInDegree = JSON.parse(JSON.stringify(inDegree));
+        nodeIdsSet.forEach((nodeId) => {
+          if (localInDegree[nodeId] === 0) q.push(nodeId);
+        });
+        const topOrder = [];
+        while (q.length > 0) {
+          const u = q.shift();
+          topOrder.push(u);
+          if (adj[u]) {
+            adj[u].forEach((edge) => {
+              localInDegree[edge.neighborId]--;
+              if (localInDegree[edge.neighborId] === 0) q.push(edge.neighborId);
+            });
+          }
+        }
+        if (topOrder.length !== nodeIdsSet.size) {
+          console.error("Graph has a cycle! TS failed.");
+          return null;
+        }
+        return topOrder;
+      }
+      function dagShortestPathAlgorithm(
+        adj,
+        topoOrder,
+        startNodeId,
+        endNodeId,
+        allNodeIdsSet
+      ) {
+        const dist = {};
+        const prev = {};
+        allNodeIdsSet.forEach((nodeId) => {
+          dist[nodeId] = Infinity;
+          prev[nodeId] = null;
+        });
+        dist[startNodeId] = 0;
+        for (const u of topoOrder) {
+          if (dist[u] === Infinity || !adj[u]) continue;
+          adj[u].forEach((edge) => {
+            const v = edge.neighborId;
+            const weight = edge.weight;
+            if (dist[v] > dist[u] + weight) {
+              dist[v] = dist[u] + weight;
+              prev[v] = u;
+            }
+          });
+        }
+        if (dist[endNodeId] === Infinity) return null;
+        const path = [];
+        let curr = endNodeId;
+        while (curr !== null) {
+          path.unshift(curr);
+          if (curr === startNodeId) break;
+          curr = prev[curr];
+          if (curr === null && path[0] !== startNodeId) return null;
+        }
+        return path[0] === startNodeId ? path : null;
+      }
+      function runMST(algorithm) {
+        if (nodes.length < 2) {
+          showMessage("Please add at least two points for MST.", "error");
+          return;
+        }
+        let mstEdges = null;
+        let mstWeight = 0;
+        clearPathsByAlgorithm(algorithm);
+        switch (algorithm) {
+          case "PRIMS":
+            mstEdges = primsAlgorithm();
+            break;
+          case "KRUSKALS":
+            mstEdges = kruskalsAlgorithm();
+            break;
+        }
+        if (mstEdges) mstWeight = drawMST(mstEdges, algorithmColors[algorithm]);
+        displayResult(algorithm, mstWeight, "m", false);
+      }
+      function primsAlgorithm() {
+        if (nodes.length === 0) return [];
+        const mstEdges = [];
+        const visited = new Set();
+        const H = new PriorityQueue();
+        const startNodeId = nodes[0].id;
+        visited.add(startNodeId);
+        const adjList = buildUndirectedGraphFromAllNodes();
+        (adjList[startNodeId] || []).forEach((edge) =>
+          H.enqueue(
+            { to: edge.neighborId, weight: edge.weight, from: startNodeId },
+            edge.weight
+          )
+        );
+        while (!H.isEmpty() && visited.size < nodes.length) {
+          const {
+            to: toNodeId,
+            weight,
+            from: fromNodeId,
+          } = H.dequeue().element;
+          if (visited.has(toNodeId)) continue;
+          visited.add(toNodeId);
+          mstEdges.push({ from: fromNodeId, to: toNodeId, weight: weight });
+          (adjList[toNodeId] || []).forEach((nEdge) => {
+            if (!visited.has(nEdge.neighborId))
+              H.enqueue(
+                { to: nEdge.neighborId, weight: nEdge.weight, from: toNodeId },
+                nEdge.weight
+              );
+          });
+        }
+        return mstEdges;
+      }
+      function kruskalsAlgorithm() {
+        if (nodes.length === 0) return [];
+        const mstEdges = [];
+        const allEdges = [];
+        for (let i = 0; i < nodes.length; i++)
+          for (let j = i + 1; j < nodes.length; j++)
+            allEdges.push({
+              from: nodes[i].id,
+              to: nodes[j].id,
+              weight: getDistance(nodes[i], nodes[j]),
+            });
+        allEdges.sort((a, b) => a.weight - b.weight);
+        const dsu = new DisjointSetUnion(nodes.map((n) => n.id));
+        for (const edge of allEdges) {
+          if (dsu.find(edge.from) !== dsu.find(edge.to)) {
+            mstEdges.push(edge);
+            dsu.union(edge.from, edge.to);
+            if (mstEdges.length === nodes.length - 1) break;
+          }
+        }
+        return mstEdges;
+      }
+      class DisjointSetUnion {
+        constructor(elements) {
+          this.parent = {};
+          this.rank = {};
+          elements.forEach((el) => {
+            this.parent[el] = el;
+            this.rank[el] = 0;
+          });
+        }
+        find(el) {
+          if (this.parent[el] !== el)
+            this.parent[el] = this.find(this.parent[el]);
+          return this.parent[el];
+        }
+        union(el1, el2) {
+          const r1 = this.find(el1);
+          const r2 = this.find(el2);
+          if (r1 !== r2) {
+            if (this.rank[r1] < this.rank[r2]) this.parent[r1] = r2;
+            else if (this.rank[r1] > this.rank[r2]) this.parent[r2] = r1;
+            else {
+              this.parent[r2] = r1;
+              this.rank[r1]++;
+            }
+            return true;
+          }
+          return false;
+        }
+      }
+      class PriorityQueue {
+        constructor() {
+          this.items = [];
+        }
+        enqueue(element, priority) {
+          const qE = { element, priority };
+          let added = false;
+          for (let i = 0; i < this.items.length; i++) {
+            if (this.items[i].priority > qE.priority) {
+              this.items.splice(i, 0, qE);
+              added = true;
+              break;
+            }
+          }
+          if (!added) this.items.push(qE);
+        }
+        dequeue() {
+          if (this.isEmpty()) return null;
+          return this.items.shift();
+        }
+        isEmpty() {
+          return this.items.length === 0;
+        }
+        contains(element) {
+          return this.items.some((item) => item.element === element);
+        }
+        updatePriority(element, newPriority) {
+          for (let i = 0; i < this.items.length; i++) {
+            if (this.items[i].element === element) {
+              this.items.splice(i, 1);
+              this.enqueue(element, newPriority);
+              return;
+            }
+          }
+        }
+      }
+
+      // --- Clearing Paths ---
+      function clearPathsByAlgorithm(algorithmName) {
+        if (algorithmName === "ROAD_ROUTE") {
+          if (lrmControl) {
+            map.removeControl(lrmControl);
+            lrmControl = null;
+          }
+        } else {
+          const colorToClear = algorithmColors[algorithmName];
+          const layersToRemove = [];
+          drawnPathLayers.eachLayer((layer) => {
+            if (layer.options.color === colorToClear)
+              layersToRemove.push(layer);
+          });
+          layersToRemove.forEach((layer) => drawnPathLayers.removeLayer(layer));
+        }
+        const resultItem = document.getElementById(`result-${algorithmName}`);
+        if (resultItem) resultItem.remove();
+      }
+
+      // --- Initialize ---
+      document.addEventListener("DOMContentLoaded", () => {
+        initMap();
+        updateModeDisplay();
+        updatePointsListUI();
+      });
+    </script>
+  </body>
+</html>
