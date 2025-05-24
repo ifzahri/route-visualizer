@@ -335,12 +335,6 @@
           <button id="addPointMode" class="btn btn-primary mb-3">
             Mode: Add Points
           </button>
-          <div class="text-xs text-gray-500 mb-3">
-            Current mode:
-            <span id="currentModeDisplay" class="font-semibold text-gray-700"
-              >Add Points</span
-            >
-          </div>
 
           <h3 class="subsection-title mb-2">Placed Points:</h3>
           <ul
@@ -354,57 +348,54 @@
 
         <div class="control-card">
           <h2 class="section-title">Algorithm Execution</h2>
-          <div class="mb-3">
-            <label
+          <div class="grid grid-cols-2 gap-2">
+            <div class="mb-3">
+              <label
               for="startNodeSelect"
               class="block text-xs font-medium text-gray-700 mb-1"
-              >Start Point for Sequence:</label
-            >
-            <select id="startNodeSelect" class="w-full"></select>
-          </div>
-          <div class="mb-4">
-            <label
+              >Start Point</label
+              >
+              <select id="startNodeSelect" class="w-full p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"></select>
+            </div>
+            <div class="mb-4">
+              <label
               for="endNodeSelect"
               class="block text-xs font-medium text-gray-700 mb-1"
-              >End Point for Sequence:</label
-            >
-            <select id="endNodeSelect" class="w-full"></select>
+              >End Point</label
+              >
+              <select id="endNodeSelect" class="w-full p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"></select>
+            </div>
           </div>
 
           <h3 class="subsection-title">
             Abstract Graph Algorithms
-            <span class="text-xs text-gray-500"
-              >(Straight Lines per Segment)</span
-            >
           </h3>
           <div class="grid grid-cols-2 gap-2 mb-3">
-            <button id="runDFS" class="btn btn-outline">DFS</button>
-            <button id="runBFS" class="btn btn-outline">BFS</button>
-            <button id="runAStar" class="btn btn-outline">A*</button>
-            <button id="runDAGSP" class="btn btn-outline">DAG SP</button>
+            <button id="runDFS" class="btn btn-secondary mb-3">DFS</button>
+            <button id="runBFS" class="btn btn-secondary mb-3">BFS</button>
+            <button id="runAStar" class="btn btn-secondary mb-3">A*</button>
+            <button id="runDAGSP" class="btn btn-secondary mb-3">Directed Acrylic Graph</button>
           </div>
-
+          
+          <h3 class="subsection-title">
+            Minimum Spanning Tree
+          </h3>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="runPrims" class="btn btn-secondary mb-3">Prim's</button>
+            <button id="runKruskals" class="btn btn-secondary mb-3">Kruskal's</button>
+          </div>
+          
           <h3 class="subsection-title">
             Road Network Algorithm
-            <span class="text-xs text-gray-500">(Sequential)</span>
           </h3>
           <button id="runRoadRoute" class="btn btn-secondary mb-3">
             Find Road Route
           </button>
-
-          <h3 class="subsection-title">
-            Minimum Spanning Tree
-            <span class="text-xs text-gray-500">(All Points)</span>
-          </h3>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="runPrims" class="btn btn-outline">Prim's</button>
-            <button id="runKruskals" class="btn btn-outline">Kruskal's</button>
-          </div>
         </div>
 
         <div class="control-card">
-          <h2 class="section-title">Results & Comparison</h2>
-          <div id="resultsDisplay" class="text-sm space-y-2"></div>
+            <h2 class="section-title">Results & Comparison</h2>
+            <div id="resultsDisplay" class="text-sm space-y-2"></div>
         </div>
       </div>
     </main>
