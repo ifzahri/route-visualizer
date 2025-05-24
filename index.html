@@ -203,7 +203,7 @@
         border-color: #94a3b8;
       }
 
-      .btn-remove-point {
+      .btn-remove-point, .btn-remove-via-point {
         background-color: transparent;
         color: #ef4444;
         padding: 0.25rem 0.5rem;
@@ -215,7 +215,7 @@
         width: auto; /* Override block for this specific button */
         display: inline-block;
       }
-      .btn-remove-point:hover {
+      .btn-remove-point:hover, .btn-remove-via-point:hover {
         background-color: #fee2e2;
         color: #dc2626;
       }
@@ -295,7 +295,7 @@
         margin-bottom: 0.5rem;
         color: #475569; /* Slate 600 */
       }
-      .points-list-item {
+      .points-list-item, .via-points-list-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -303,7 +303,7 @@
         font-size: 0.875rem;
         border-bottom: 1px dashed #e2e8f0;
       }
-      .points-list-item:last-child {
+      .points-list-item:last-child, .via-points-list-item:last-child {
         border-bottom: none;
       }
 
@@ -388,8 +388,22 @@
               ></select>
             </div>
           </div>
+          
+          <h3 class="subsection-title mt-3">Via Points (Optional)</h3>
+          <div class="mb-2">
+              <label for="viaPointSelect" class="block text-xs font-medium text-gray-700 mb-1">Add Via Point</label>
+              <div class="flex gap-2">
+                  <select id="viaPointSelect" class="flex-grow p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"></select>
+                  <button id="addViaPointBtn" class="btn btn-outline px-3 py-2 text-sm !w-auto">Add</button>
+              </div>
+          </div>
+          <ul id="viaPointsListUI" class="text-sm text-gray-700 max-h-24 overflow-y-auto space-y-1 pr-2 mb-2 border border-gray-200 rounded-md p-2 bg-gray-50 min-h-[2.5rem]">
+              <li class="text-gray-400 italic no-via-points-placeholder">No via points added.</li>
+          </ul>
+          <button id="clearViaPointsBtn" class="btn btn-outline text-xs py-1 !w-auto self-end">Clear Via Points</button>
 
-          <h3 class="subsection-title">Abstract Graph Algorithms</h3>
+
+          <h3 class="subsection-title mt-4">Abstract Graph Algorithms (Sequential)</h3>
           <div class="grid grid-cols-2 gap-2 mb-3">
             <button id="runBFS" class="btn btn-secondary mb-3">BFS</button>
             <button id="runDAGSP" class="btn btn-secondary mb-3">
@@ -398,6 +412,7 @@
           </div>
 
           <h3 class="subsection-title">Minimum Spanning Tree</h3>
+          <p class="text-xs text-gray-500 mb-2">Operates on Start, End, and Via points if Via points are selected. Otherwise, uses all placed points.</p>
           <div class="grid grid-cols-2 gap-2">
             <button id="runPrims" class="btn btn-secondary mb-3">Prim's</button>
             <button id="runKruskals" class="btn btn-secondary mb-3">
@@ -406,6 +421,7 @@
           </div>
 
           <h3 class="subsection-title">Road Network Algorithm</h3>
+          <p class="text-xs text-gray-500 mb-2">If Via points are selected, uses Start -> Vias -> End. Otherwise, routes through all placed points in their original placement order.</p>
           <button id="runRoadRoute" class="btn btn-secondary mb-3">
             Find Road Route
           </button>
@@ -421,35 +437,31 @@
     <script>
       // --- Global Variables ---
       let map;
-      let nodes = []; // Stores { id, name, lat, lng, marker, originalIndex }
-      let drawnPathLayers = L.featureGroup(); // Layer group for algorithm-drawn paths
-      let currentMode = "addPoint"; // Current map interaction mode
-      let nextNodeId = 1; // Counter for unique node IDs
-      let lrmControl = null; // Leaflet Routing Machine control instance
-      const messageBox = document.getElementById("messageBox"); // UI for messages
-      let searchTimeout = null; // Timeout for debouncing location search
+      let nodes = []; 
+      let drawnPathLayers = L.featureGroup();
+      let currentMode = "addPoint";
+      let nextNodeId = 1;
+      let lrmControl = null;
+      const messageBox = document.getElementById("messageBox");
+      let searchTimeout = null;
+      let selectedViaPoints = []; // Array to store IDs of selected via points
 
-      // Colors for different algorithms
       const algorithmColors = {
-        BFS: "#3b82f6", // Blue
-        DAG_SP: "#ec4899", // Pink
-        PRIMS: "#f97316", // Orange
-        KRUSKALS: "#8b5cf6", // Purple
-        ROAD_ROUTE: "#14b8a6", // Teal
+        BFS: "#3b82f6", 
+        DAG_SP: "#ec4899",
+        PRIMS: "#f97316",
+        KRUSKALS: "#8b5cf6",
+        ROAD_ROUTE: "#14b8a6",
       };
 
       // --- Map Initialization ---
       function initMap() {
-        // Initialize Leaflet map centered on Surabaya, Indonesia
         map = L.map("map").setView([-7.2575, 112.7521], 13);
-        // Add OpenStreetMap tile layer
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution:
             '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }).addTo(map);
-        // Add layer group for drawn paths to the map
         drawnPathLayers.addTo(map);
-        // Handle map clicks for adding points or clearing search
         map.on("click", handleMapClick);
         map.on("click", () =>
           document.getElementById("searchSuggestions").classList.add("hidden")
@@ -457,17 +469,19 @@
       }
 
       // --- UI Element Getters ---
-      const locationSearchInput = document.getElementById(
-        "locationSearchInput"
-      );
-      const searchSuggestionsList =
-        document.getElementById("searchSuggestions");
+      const locationSearchInput = document.getElementById("locationSearchInput");
+      const searchSuggestionsList = document.getElementById("searchSuggestions");
       const addPointModeBtn = document.getElementById("addPointMode");
       const resetPointsBtn = document.getElementById("resetPoints");
       const startNodeSelect = document.getElementById("startNodeSelect");
       const endNodeSelect = document.getElementById("endNodeSelect");
       const pointsListUI = document.getElementById("pointsList");
       const resultsDisplay = document.getElementById("resultsDisplay");
+      const viaPointSelect = document.getElementById("viaPointSelect");
+      const addViaPointBtn = document.getElementById("addViaPointBtn");
+      const viaPointsListUI = document.getElementById("viaPointsListUI");
+      const clearViaPointsBtn = document.getElementById("clearViaPointsBtn");
+
 
       // --- Event Listeners Setup ---
       function setupEventListeners() {
@@ -495,10 +509,10 @@
 
         document
           .getElementById("runBFS")
-          .addEventListener("click", () => runPathfindingAlgorithm("BFS"));
+          .addEventListener("click", () => runSequentialPathfindingAlgorithm("BFS"));
         document
           .getElementById("runDAGSP")
-          .addEventListener("click", () => runPathfindingAlgorithm("DAG_SP"));
+          .addEventListener("click", () => runSequentialPathfindingAlgorithm("DAG_SP"));
         document
           .getElementById("runRoadRoute")
           .addEventListener("click", runRoadRouteSequential);
@@ -509,6 +523,19 @@
           .getElementById("runKruskals")
           .addEventListener("click", () => runMST("KRUSKALS"));
         pointsListUI.addEventListener("click", handlePointListActions);
+
+        addViaPointBtn.addEventListener('click', handleAddViaPoint);
+        viaPointsListUI.addEventListener('click', handleViaPointListActions);
+        clearViaPointsBtn.addEventListener('click', handleClearViaPoints);
+
+        startNodeSelect.addEventListener('change', () => {
+            updateViaPointSelectorOptions(); 
+            clearAllDrawnPathsAndResults();
+        });
+        endNodeSelect.addEventListener('change', () => {
+            updateViaPointSelectorOptions(); 
+            clearAllDrawnPathsAndResults();
+        });
       }
 
 
@@ -608,7 +635,6 @@
         }
       }
 
-      // --- Message Display Utility ---
       function showMessage(message, type = "info", duration = 3000) {
         messageBox.textContent = message;
         messageBox.style.backgroundColor =
@@ -618,13 +644,14 @@
             ? "#22c55e"
             : type === "info"
             ? "#3b82f6"
+            : type === "warning"
+            ? "#f97316" 
             : "#6b7280";
         messageBox.style.color = "white";
         messageBox.classList.add("show");
         setTimeout(() => messageBox.classList.remove("show"), duration);
       }
 
-      // --- Mode & Point Management ---
       function updateModeDisplay() {
         addPointModeBtn.textContent = `Mode: ${
           currentMode === "addPoint" ? "Add Points" : "N/A"
@@ -656,9 +683,9 @@
             lat: e.latlng.lat,
             lng: e.latlng.lng,
             marker: marker,
-            originalIndex: nodes.length - 1,
+            originalIndex: nodes.length - 1, 
           });
-          updatePointSelectors();
+          updatePointSelectors(); 
           updatePointsListUI();
           clearAllDrawnPathsAndResults();
         }
@@ -667,8 +694,10 @@
       function updatePointSelectors() {
         const currentStartVal = startNodeSelect.value;
         const currentEndVal = endNodeSelect.value;
+
         startNodeSelect.innerHTML = "";
         endNodeSelect.innerHTML = "";
+        
         nodes.forEach((node) => {
           const optionStart = document.createElement("option");
           optionStart.value = node.id;
@@ -680,6 +709,7 @@
           optionEnd.textContent = node.name;
           endNodeSelect.appendChild(optionEnd);
         });
+
         if (nodes.find((n) => n.id === parseInt(currentStartVal))) {
           startNodeSelect.value = currentStartVal;
         }
@@ -692,7 +722,32 @@
         } else if (nodes.length > 0) {
            endNodeSelect.value = nodes[nodes.length - 1].id;
         }
+        updateViaPointSelectorOptions(); 
+        updateViaPointsListUI(); 
       }
+
+       function updateViaPointSelectorOptions() {
+        const currentViaVal = viaPointSelect.value;
+        viaPointSelect.innerHTML = '<option value="">Select a via point...</option>';
+        const startId = parseInt(startNodeSelect.value);
+        const endId = parseInt(endNodeSelect.value);
+
+        nodes.forEach(node => {
+            if (node.id !== startId && node.id !== endId && !selectedViaPoints.includes(node.id)) {
+                const optionVia = document.createElement("option");
+                optionVia.value = node.id;
+                optionVia.textContent = node.name;
+                viaPointSelect.appendChild(optionVia);
+            }
+        });
+         if (nodes.find(n => n.id === parseInt(currentViaVal)) && 
+            parseInt(currentViaVal) !== startId && 
+            parseInt(currentViaVal) !== endId && 
+            !selectedViaPoints.includes(parseInt(currentViaVal))) {
+            viaPointSelect.value = currentViaVal;
+        }
+    }
+
 
       function updatePointsListUI() {
         pointsListUI.innerHTML =
@@ -726,12 +781,82 @@
         const nodeToRemove = nodes[nodeIndex];
         map.removeLayer(nodeToRemove.marker);
         nodes.splice(nodeIndex, 1);
+        
+        selectedViaPoints = selectedViaPoints.filter(id => id !== nodeId);
         nodes.forEach((node, index) => (node.originalIndex = index));
 
-        updatePointSelectors();
+        updatePointSelectors(); 
         updatePointsListUI();
         clearAllDrawnPathsAndResults();
         showMessage(`Point ${nodeToRemove.name} removed.`, "info", 2000);
+      }
+
+      function handleAddViaPoint() {
+        const selectedId = parseInt(viaPointSelect.value);
+        if (!selectedId) {
+            showMessage("Please select a point to add as a via point.", "info");
+            return;
+        }
+        if (selectedId === parseInt(startNodeSelect.value) || selectedId === parseInt(endNodeSelect.value)) {
+            showMessage("Via point cannot be the same as Start or End point.", "warning");
+            return;
+        }
+        if (selectedViaPoints.includes(selectedId)) {
+            showMessage("This point is already in the via list.", "info");
+            return;
+        }
+        selectedViaPoints.push(selectedId);
+        updateViaPointsListUI();
+        updateViaPointSelectorOptions(); 
+        clearAllDrawnPathsAndResults();
+      }
+
+      function updateViaPointsListUI() {
+        const placeholder = viaPointsListUI.querySelector('.no-via-points-placeholder');
+        if (selectedViaPoints.length === 0) {
+            if (!placeholder) { 
+                 viaPointsListUI.innerHTML = '<li class="text-gray-400 italic no-via-points-placeholder">No via points added.</li>';
+            } else { 
+                viaPointsListUI.innerHTML = '';
+                viaPointsListUI.appendChild(placeholder);
+            }
+            return;
+        }
+        
+        if(placeholder) placeholder.remove(); 
+        viaPointsListUI.innerHTML = ""; 
+
+        selectedViaPoints.forEach((nodeId, index) => {
+            const node = nodes.find(n => n.id === nodeId);
+            if (node) {
+                const li = document.createElement("li");
+                li.classList.add("via-points-list-item");
+                li.dataset.viaNodeId = nodeId;
+                li.innerHTML = `
+                    <span>${index + 1}. ${node.name}</span>
+                    <button class="btn-remove-via-point" data-remove-via-id="${nodeId}" title="Remove ${node.name}">×</button>
+                `;
+                viaPointsListUI.appendChild(li);
+            }
+        });
+      }
+      
+      function handleViaPointListActions(event) {
+        if (event.target.matches("[data-remove-via-id]")) {
+            const nodeIdToRemove = parseInt(event.target.dataset.removeViaId);
+            selectedViaPoints = selectedViaPoints.filter(id => id !== nodeIdToRemove);
+            updateViaPointsListUI();
+            updateViaPointSelectorOptions(); 
+            clearAllDrawnPathsAndResults();
+        }
+      }
+
+      function handleClearViaPoints() {
+        selectedViaPoints = [];
+        updateViaPointsListUI();
+        updateViaPointSelectorOptions(); 
+        clearAllDrawnPathsAndResults();
+        showMessage("All via points cleared.", "info");
       }
 
       function clearAllDrawnPathsAndResults() {
@@ -746,9 +871,10 @@
       function resetAll() {
         nodes.forEach((node) => map.removeLayer(node.marker));
         nodes = [];
+        selectedViaPoints = [];
         nextNodeId = 1;
         clearAllDrawnPathsAndResults();
-        updatePointSelectors();
+        updatePointSelectors(); 
         updatePointsListUI();
         currentMode = "addPoint";
         updateModeDisplay();
@@ -758,68 +884,93 @@
         showMessage("Map and all points cleared.", "info");
       }
 
-      function getNodeSequence() {
-        if (nodes.length === 0) {
-          showMessage( "Please add at least two points to define a sequence.", "error" );
-          return null;
-        }
-        if (nodes.length === 1) {
-          showMessage( "Only one point exists. Add more to define a sequence path.", "info" );
-          return [nodes[0]];
-        }
-        const startId = parseInt(startNodeSelect.value);
-        const endId = parseInt(endNodeSelect.value);
-        if (isNaN(startId) || isNaN(endId)) {
-          showMessage( "Please select valid start and end points for the sequence.", "error" );
-          return null;
-        }
+      function getWaypointSequence(startNodeId, endNodeId, isForRoadRoute = false, viaPointIdsArg = []) {
+        const viaPointIds = [...viaPointIdsArg]; 
 
-        const startNode = nodes.find(n => n.id === startId);
-        const endNode = nodes.find(n => n.id === endId);
+        if (nodes.length === 0) {
+          if (!isForRoadRoute && viaPointIds.length === 0) showMessage("Please add points to the map first.", "error");
+          return null;
+        }
+        const startNode = nodes.find(n => n.id === startNodeId);
+        const endNode = nodes.find(n => n.id === endNodeId);
 
         if (!startNode || !endNode) {
-            showMessage("Selected start or end node for sequence not found.", "error");
-            return null;
-        }
-        if (startNode.originalIndex > endNode.originalIndex) {
-          showMessage( "For sequential road routing, Start point must come before End point in placement order.", "error" );
+          if (!isForRoadRoute && viaPointIds.length === 0) showMessage("Selected start or end node not found for sequence.", "error");
           return null;
         }
-        const sequence = nodes
-            .filter(n => n.originalIndex >= startNode.originalIndex && n.originalIndex <= endNode.originalIndex)
-            .sort((a, b) => a.originalIndex - b.originalIndex);
 
-        if (sequence.length === 1 && startId === endId) {
-          showMessage( "Start and end points are the same for sequence. No path to calculate.", "info" );
+        let finalSequenceNodes = [];
+        if (startNode) finalSequenceNodes.push(startNode);
+
+        viaPointIds.forEach(vid => {
+            const viaNode = nodes.find(n => n.id === vid);
+            if (viaNode) {
+                if (!finalSequenceNodes.length || finalSequenceNodes[finalSequenceNodes.length - 1].id !== viaNode.id) {
+                    finalSequenceNodes.push(viaNode);
+                }
+            }
+        });
+        
+        if (endNode) {
+            if (!finalSequenceNodes.length || finalSequenceNodes[finalSequenceNodes.length - 1].id !== endNode.id) {
+                 finalSequenceNodes.push(endNode);
+            }
+        }
+        
+        finalSequenceNodes = finalSequenceNodes.filter((item, index, arr) => {
+            return index === 0 || item.id !== arr[index-1].id;
+        });
+
+
+        if (finalSequenceNodes.length === 1 && startNode.id === endNode.id && viaPointIds.length === 0) {
+          if (!isForRoadRoute) showMessage(`Path from ${startNode.name} to itself is 0m.`, "info");
           return [startNode];
         }
-        if (sequence.length < 2 && startId !== endId) {
-          showMessage( "Sequence requires at least two distinct points for a path between the selected start and end.", "info" );
-          return null;
+        
+        if (finalSequenceNodes.length < 2 && !(startNode.id === endNode.id && viaPointIds.length === 0) ) {
+             if (!isForRoadRoute) showMessage("The defined sequence requires at least two distinct points.", "info");
+             return null;
         }
-        return sequence;
+         if (finalSequenceNodes.length < 1) return null;
+
+        // The strict originalIndex check for RoadRoute is removed here.
+        // Leaflet Routing Machine will handle the arbitrary sequence.
+        // if (isForRoadRoute) {
+        //     for(let i=0; i < finalSequenceNodes.length - 1; i++) {
+        //         if (finalSequenceNodes[i].originalIndex > finalSequenceNodes[i+1].originalIndex) {
+        //              showMessage( "For sequential road routing, all waypoints in the final sequence must follow their original placement order.", "error" );
+        //              return null;
+        //         }
+        //     }
+        // }
+        return finalSequenceNodes;
       }
 
-      // --- Distance Calculation & Graph Building ---
+
       function getDistance(node1, node2) {
         const latLng1 = L.latLng(node1.lat, node1.lng);
         const latLng2 = L.latLng(node2.lat, node2.lng);
         return latLng1.distanceTo(latLng2);
       }
-
-      function buildUndirectedGraphFromAllNodes() {
+      
+      function buildUndirectedGraphFromSpecificNodes(specificNodes) {
         const adjList = {};
-        nodes.forEach((node) => (adjList[node.id] = []));
-        for (let i = 0; i < nodes.length; i++) {
-          for (let j = i + 1; j < nodes.length; j++) {
-            const node1 = nodes[i];
-            const node2 = nodes[j];
-            const distance = getDistance(node1, node2);
-            adjList[node1.id].push({ neighborId: node2.id, weight: distance });
-            adjList[node2.id].push({ neighborId: node1.id, weight: distance });
-          }
+        specificNodes.forEach((node) => (adjList[node.id] = []));
+        for (let i = 0; i < specificNodes.length; i++) {
+            for (let j = i + 1; j < specificNodes.length; j++) {
+                const node1 = specificNodes[i];
+                const node2 = specificNodes[j];
+                const distance = getDistance(node1, node2);
+                adjList[node1.id].push({ neighborId: node2.id, weight: distance });
+                adjList[node2.id].push({ neighborId: node1.id, weight: distance });
+            }
         }
         return adjList;
+    }
+
+
+      function buildUndirectedGraphFromAllNodes() {
+        return buildUndirectedGraphFromSpecificNodes(nodes);
       }
 
       function buildDirectedAcyclicGraphFromAllNodes() {
@@ -855,46 +1006,45 @@
         }
       }
 
-      // --- Path Drawing Utilities ---
       function drawPathSegment(pathNodeIds, color) {
         if (!pathNodeIds || pathNodeIds.length < 2) return 0;
         
-        let totalPathLength = 0;
+        let totalSegmentLength = 0;
         for (let i = 0; i < pathNodeIds.length - 1; i++) {
             const nodeA = nodes.find((n) => n.id === pathNodeIds[i]);
             const nodeB = nodes.find((n) => n.id === pathNodeIds[i + 1]);
 
             if (nodeA && nodeB) {
-                const segmentLatLngs = [[nodeA.lat, nodeA.lng], [nodeB.lat, nodeB.lng]];
-                const distance = getDistance(nodeA, nodeB);
-                totalPathLength += distance;
+                const singleHopLatLngs = [[nodeA.lat, nodeA.lng], [nodeB.lat, nodeB.lng]];
+                const hopDistance = getDistance(nodeA, nodeB);
+                totalSegmentLength += hopDistance;
 
-                const polyline = L.polyline(segmentLatLngs, {
+                const polyline = L.polyline(singleHopLatLngs, {
                     color: color,
                     weight: 5,
                     opacity: 0.75,
-                    dashArray: "1,0", // Solid line for path segments
+                    dashArray: "1,0", 
                 });
 
-                const weightText = formatDistance(distance);
+                const weightText = formatDistance(hopDistance);
                 polyline.bindTooltip(weightText, {
                     permanent: true,
                     direction: 'center',
-                    className: 'edge-label', // Use the same class as MST labels for consistency
+                    className: 'edge-label', 
                     sticky: false
-                }).addTo(drawnPathLayers);
-                 polyline.addTo(drawnPathLayers);
+                });
+                polyline.addTo(drawnPathLayers);
             }
         }
-        return totalPathLength;
+        return totalSegmentLength;
       }
 
       function drawMST(mstEdges, color) {
         if (!mstEdges || mstEdges.length === 0) return 0;
         let totalWeight = 0;
         mstEdges.forEach((edge) => {
-          const nodeFrom = nodes.find((n) => n.id === edge.from);
-          const nodeTo = nodes.find((n) => n.id === edge.to);
+          const nodeFrom = nodes.find((n) => n.id === edge.from); 
+          const nodeTo = nodes.find((n) => n.id === edge.to);     
           if (nodeFrom && nodeTo) {
             const latLngs = [
                 [nodeFrom.lat, nodeFrom.lng],
@@ -904,7 +1054,7 @@
                 color: color,
                 weight: 4,
                 opacity: 0.7,
-                dashArray: "5, 5", // Dashed line for MST
+                dashArray: "5, 5",
             });
 
             const weightText = formatDistance(edge.weight);
@@ -922,7 +1072,6 @@
         return totalWeight;
       }
 
-      // --- Result Display ---
       function displayResult(
         algorithmName,
         metricValue,
@@ -938,20 +1087,25 @@
           resultsDisplay.appendChild(resultItem);
         }
         const colorBoxHTML = `<span class="color-box" style="background-color:${algorithmColors[algorithmName]};"></span>`;
-        const metricType = isPath ? "Path Length" : "MST Weight";
+        const metricType = isPath ? "Total Path Length" : "MST Total Weight";
         
         const metricDisplay = formatDistance(metricValue);
 
         let additionalInfo = "";
-        if (metricValue === 0) {
-            if (isPath && algorithmName !== "ROAD_ROUTE") {
-              additionalInfo = " (No path or start=end)";
-            } else if (!isPath) {
-              additionalInfo = " (No MST formed or single point)";
-            } else if ( isPath && algorithmName === "ROAD_ROUTE" && nodes.length > 1 && startNodeSelect.value !== endNodeSelect.value ) {
-              additionalInfo = " (Route not found or 0km)";
+         if (metricValue === 0 && isPath) {
+            const startId = parseInt(startNodeSelect.value);
+            const endId = parseInt(endNodeSelect.value);
+            if (startId === endId && nodes.find(n => n.id === startId) && selectedViaPoints.length === 0) {
+                 additionalInfo = " (Start and end point are the same)";
+            } else if (algorithmName !== "ROAD_ROUTE") {
+                 additionalInfo = " (No path found or 0km)";
+            } else if (nodes.length > 1){ 
+                 additionalInfo = " (Route not found or 0km)";
             }
+        } else if (metricValue === 0 && !isPath) { 
+              additionalInfo = " (No MST formed or single point)";
         }
+
 
         resultItem.innerHTML = `${colorBoxHTML}<div><strong>${algorithmName.replace(
           /_/g,
@@ -959,7 +1113,7 @@
         )}</strong>: <span class="text-gray-600">${metricType}: ${metricDisplay}${additionalInfo}</span></div>`;
       }
 
-      function runPathfindingAlgorithm(algorithm) {
+    function runSequentialPathfindingAlgorithm(algorithm) {
         const startId = parseInt(startNodeSelect.value);
         const endId = parseInt(endNodeSelect.value);
 
@@ -968,105 +1122,158 @@
             return;
         }
         if (isNaN(startId) || isNaN(endId)) {
-            showMessage("Please select valid start and end points from the dropdowns.", "error");
+            showMessage("Please select valid start and end points.", "error");
             return;
         }
-        const startNode = nodes.find(n => n.id === startId);
-        const endNode = nodes.find(n => n.id === endId);
+        
+        const waypointSequence = getWaypointSequence(startId, endId, false, selectedViaPoints);
 
-        if (!startNode || !endNode) {
-            showMessage("Selected start or end point no longer exists on the map.", "error");
+        if (!waypointSequence) { 
+            clearPathsByAlgorithm(algorithm);
+            displayResult(algorithm, 0, "m", true); 
             return;
         }
-
-        if (startId === endId) {
-            showMessage(`Path from ${startNode.name} to itself is 0m.`, "info");
+        if (waypointSequence.length === 1 && startId === endId && selectedViaPoints.length === 0) {
             clearPathsByAlgorithm(algorithm);
             displayResult(algorithm, 0, "m", true);
             return;
         }
-        
+        if (waypointSequence.length < 2) {
+            showMessage("Sequential path requires at least two distinct points in the final sequence.", "info");
+            clearPathsByAlgorithm(algorithm);
+            displayResult(algorithm, 0, "m", true);
+            return;
+        }
+
         clearPathsByAlgorithm(algorithm);
         let graph, dagData, globalTopoOrder;
+        let overallPathLength = 0;
+        let allSegmentsFound = true;
 
         if (algorithm === "DAG_SP") {
             dagData = buildDirectedAcyclicGraphFromAllNodes();
             graph = dagData.adj;
             globalTopoOrder = topologicalSort(dagData.adj, dagData.inDegree, dagData.nodeIds);
             if (!globalTopoOrder) {
-                showMessage("Cannot run DAG algorithm: Graph structure is invalid for topological sort.", "error");
+                showMessage("Cannot run DAG algorithm: Graph structure issue.", "error");
                 displayResult(algorithm, 0, "m", true);
                 return;
             }
-        } else {
+        } else { 
             graph = buildUndirectedGraphFromAllNodes();
         }
 
-        let path = null;
-        switch (algorithm) {
-            case "BFS":
-                path = bfs(graph, startId, endId);
-                break;
-            case "DAG_SP":
-                path = dagShortestPathAlgorithm(graph, globalTopoOrder, startId, endId, dagData.nodeIds);
-                break;
+        for (let i = 0; i < waypointSequence.length - 1; i++) {
+            const segmentStartNode = waypointSequence[i]; 
+            const segmentEndNode = waypointSequence[i+1]; 
+            let segmentPathIds = null;
+
+            if (segmentStartNode.id === segmentEndNode.id) continue;
+
+            switch (algorithm) {
+                case "BFS":
+                    segmentPathIds = bfs(graph, segmentStartNode.id, segmentEndNode.id);
+                    break;
+                case "DAG_SP":
+                    segmentPathIds = dagShortestPathAlgorithm(graph, globalTopoOrder, segmentStartNode.id, segmentEndNode.id, dagData.nodeIds);
+                    break;
+            }
+
+            if (segmentPathIds) {
+                overallPathLength += drawPathSegment(segmentPathIds, algorithmColors[algorithm]);
+            } else {
+                allSegmentsFound = false;
+                showMessage(`No path found for segment: ${segmentStartNode.name} to ${segmentEndNode.name}.`, "warning", 2500);
+            }
         }
 
-        if (path) {
-            const pathLength = drawPathSegment(path, algorithmColors[algorithm]);
-            displayResult(algorithm, pathLength, "m", true);
-            showMessage(`${algorithm}: Path calculated.`, "success", 2000);
-        } else {
-            displayResult(algorithm, 0, "m", true);
-            showMessage(`${algorithm}: No path found between ${startNode.name} and ${endNode.name}.`, "error");
+        displayResult(algorithm, overallPathLength, "m", true);
+        if (overallPathLength > 0 && allSegmentsFound) {
+            showMessage(`${algorithm}: Sequential path calculated.`, "success");
+        } else if (overallPathLength > 0 && !allSegmentsFound) {
+            showMessage(`${algorithm}: Sequential path partially calculated. Some segments missing.`, "warning");
+        } else if (overallPathLength === 0 && waypointSequence.length > 1) {
+             showMessage(`${algorithm}: No segments of the sequential path could be found.`, "error");
         }
     }
 
-      function runRoadRouteSequential() {
-        const sequence = getNodeSequence();
-        if ( !sequence || sequence.length < 2 || (sequence.length === 1 && sequence[0].id === parseInt(startNodeSelect.value) && sequence[0].id === parseInt(endNodeSelect.value)) ) {
-          if (sequence && sequence.length === 1) {
-            clearPathsByAlgorithm("ROAD_ROUTE");
-            displayResult("ROAD_ROUTE", 0, "m", true);
-          }
-          return;
+
+    function runRoadRouteSequential() {
+        clearPathsByAlgorithm("ROAD_ROUTE"); 
+
+        let finalWaypointsForRoute = []; 
+
+        if (selectedViaPoints.length > 0) {
+            const startId = parseInt(startNodeSelect.value);
+            const endId = parseInt(endNodeSelect.value);
+            if (isNaN(startId) || isNaN(endId)) {
+                showMessage("Please select valid Start and End points when using Via Points for Road Route.", "error");
+                displayResult("ROAD_ROUTE", 0, "m", true);
+                return;
+            }
+            // For Road Route with via points, isForRoadRoute is true, but the strict originalIndex check inside getWaypointSequence is removed.
+            // The sequence will be Start -> Vias (user order) -> End.
+            finalWaypointsForRoute = getWaypointSequence(startId, endId, true, selectedViaPoints); 
+            if (!finalWaypointsForRoute) {
+                displayResult("ROAD_ROUTE", 0, "m", true);
+                return; 
+            }
+        } else {
+            // No Via Points: use ALL placed nodes in their original placement order
+            if (nodes.length < 2) {
+                showMessage("Road Route (all points mode) requires at least two points on the map.", "info");
+                displayResult("ROAD_ROUTE", 0, "m", true);
+                return;
+            }
+            finalWaypointsForRoute = [...nodes].sort((a, b) => a.originalIndex - b.originalIndex);
+            showMessage("Calculating Road Route for all placed points in order.", "info", 2500);
         }
-        clearPathsByAlgorithm("ROAD_ROUTE");
-        const waypoints = sequence.map((node) => L.latLng(node.lat, node.lng));
+
+        if (!finalWaypointsForRoute || finalWaypointsForRoute.length < 2) {
+            if (finalWaypointsForRoute && finalWaypointsForRoute.length === 1 && 
+                selectedViaPoints.length === 0 && 
+                parseInt(startNodeSelect.value) === parseInt(endNodeSelect.value) ) {
+                 // This case is fine, start=end, no vias
+            } else if (finalWaypointsForRoute && finalWaypointsForRoute.length < 2) {
+                 showMessage("Road Route requires at least two points to form a path in the final sequence.", "info");
+            }
+            displayResult("ROAD_ROUTE", 0, "m", true);
+            return;
+        }
+
+        const waypointsForLRM = finalWaypointsForRoute.map((node) => L.latLng(node.lat, node.lng));
+
         if (lrmControl) {
             map.removeControl(lrmControl);
             lrmControl = null;
         }
+
         lrmControl = L.Routing.control({
-          waypoints: waypoints,
-          routeWhileDragging: false,
-          show: true,
-          addWaypoints: false,
-          lineOptions: {
-            styles: [
-              { color: algorithmColors.ROAD_ROUTE, opacity: 0.8, weight: 7 },
-            ],
-          },
-          createMarker: function () {
-            return null;
-          },
+            waypoints: waypointsForLRM,
+            routeWhileDragging: false,
+            show: true,
+            addWaypoints: false,
+            lineOptions: {
+                styles: [{ color: algorithmColors.ROAD_ROUTE, opacity: 0.8, weight: 7 }],
+            },
+            createMarker: function () { return null; },
         })
-          .on("routesfound", function (e) {
+        .on("routesfound", function (e) {
             if (e.routes && e.routes.length > 0 && e.routes[0].summary) {
-              displayResult( "ROAD_ROUTE", e.routes[0].summary.totalDistance, "m", true );
-              showMessage("Sequential road route found!", "success", 2000);
+                displayResult("ROAD_ROUTE", e.routes[0].summary.totalDistance, "m", true);
+                showMessage("Road route found!", "success", 2000);
             } else {
-              showMessage( "Road route found but no distance summary or route is invalid.", "info" );
-              displayResult("ROAD_ROUTE", 0, "m", true);
+                showMessage("Road route found but no distance summary or route is invalid.", "info");
+                displayResult("ROAD_ROUTE", 0, "m", true);
             }
-          })
-          .on("routingerror", function (e) {
+        })
+        .on("routingerror", function (e) {
             console.error("Road Routing error:", e.error);
-            showMessage( `Road routing error: ${ e.error.message || "Could not find route." }`, "error" );
+            showMessage(`Road routing error: ${e.error.message || "Could not find route."}`, "error");
             displayResult("ROAD_ROUTE", 0, "m", true);
-          })
-          .addTo(map);
-      }
+        })
+        .addTo(map);
+    }
 
       function bfs(graph, startId, endId) {
         const visited = new Set();
@@ -1145,51 +1352,108 @@
         return path[0] === startNodeId ? path : null;
       }
 
-      function runMST(algorithm) {
-        if (nodes.length < 2) {
-          showMessage("Please add at least two points for MST calculation.", "error");
-          if (nodes.length === 1) {
-            clearPathsByAlgorithm(algorithm);
-            displayResult(algorithm, 0, "m", false);
-          }
-          return;
+    function runMST(algorithm) {
+        let activeNodesForMST = [];
+        let operationMode = "all_nodes"; 
+
+        if (selectedViaPoints.length > 0) {
+            const startId = parseInt(startNodeSelect.value);
+            const endId = parseInt(endNodeSelect.value);
+
+            if (isNaN(startId) || isNaN(endId)) {
+                showMessage("Please select Start and End points when using Via Points for MST.", "error");
+                return;
+            }
+            const startNode = nodes.find(n => n.id === startId);
+            const endNode = nodes.find(n => n.id === endId);
+
+            if (!startNode || !endNode) {
+                showMessage("Start or End point not found. Please ensure they are selected.", "error");
+                return;
+            }
+
+            const nodeIdSet = new Set();
+            if(startNode) nodeIdSet.add(startNode.id);
+            selectedViaPoints.forEach(id => nodeIdSet.add(id));
+            if(endNode) nodeIdSet.add(endNode.id);
+            
+            activeNodesForMST = Array.from(nodeIdSet).map(id => nodes.find(n => n.id === id)).filter(Boolean);
+            operationMode = "subset_nodes";
+
+            if (activeNodesForMST.length < 2) {
+                showMessage(`MST on subset requires at least two unique points. Found ${activeNodesForMST.length}.`, "info");
+                clearPathsByAlgorithm(algorithm);
+                displayResult(algorithm, 0, "m", false);
+                return;
+            }
+            showMessage(`Calculating MST for the subset: ${activeNodesForMST.map(n => n.name).join(', ')}.`, "info", 3000);
+
+        } else {
+            activeNodesForMST = [...nodes]; 
+            operationMode = "all_nodes";
+            if (activeNodesForMST.length === 0 ) { 
+                showMessage("No points on the map to calculate MST.", "error");
+                return;
+            }
+            if (activeNodesForMST.length < 2) {
+                showMessage("MST requires at least two points. Add more points on the map.", "info");
+                if (activeNodesForMST.length === 1) { 
+                    clearPathsByAlgorithm(algorithm);
+                    displayResult(algorithm, 0, "m", false); 
+                }
+                return;
+            }
         }
+
         let mstEdges = null;
         let mstWeight = 0;
         clearPathsByAlgorithm(algorithm);
-        switch (algorithm) {
-          case "PRIMS":
-            mstEdges = primsAlgorithm();
-            break;
-          case "KRUSKALS":
-            mstEdges = kruskalsAlgorithm();
-            break;
-        }
-        if (mstEdges) mstWeight = drawMST(mstEdges, algorithmColors[algorithm]);
-        displayResult(algorithm, mstWeight, "m", false);
-         if (mstEdges && mstEdges.length > 0) {
-            showMessage(`${algorithm}'s MST calculated.`, "success");
-        } else if (nodes.length >=2 && (!mstEdges || mstEdges.length === 0)) {
-            showMessage(`${algorithm}'s MST could not be formed.`, "info");
-        }
-      }
 
-      function primsAlgorithm() {
-        if (nodes.length === 0) return [];
+        switch (algorithm) {
+            case "PRIMS":
+                mstEdges = primsAlgorithm(activeNodesForMST);
+                break;
+            case "KRUSKALS":
+                mstEdges = kruskalsAlgorithm(activeNodesForMST);
+                break;
+        }
+
+        if (mstEdges && mstEdges.length > 0) {
+            mstWeight = drawMST(mstEdges, algorithmColors[algorithm]);
+            showMessage(`${algorithm}'s MST calculated${operationMode === "subset_nodes" ? " for the subset" : ""}.`, "success");
+        } else if (activeNodesForMST.length >= 2 ) { 
+            showMessage(`${algorithm}'s MST could not be formed${operationMode === "subset_nodes" ? " for the subset" : ""}. (e.g. not enough points for edges)`, "info");
+        } else if (activeNodesForMST.length === 1 && operationMode === "subset_nodes") {
+             showMessage(`${algorithm}'s MST for a single point in subset is 0.`, "info");
+        }
+
+        displayResult(algorithm, mstWeight, "m", false);
+    }
+
+      function primsAlgorithm(activeNodes) { 
+        if (!activeNodes || activeNodes.length < 1) return []; 
+        if (activeNodes.length === 1) return []; 
+
         const mstEdges = [];
         const visited = new Set();
         const H = new PriorityQueue();
-        const startNodeId = nodes[0].id;
+        
+        const startNodeId = activeNodes[0].id; 
         visited.add(startNodeId);
-        const adjList = buildUndirectedGraphFromAllNodes();
+
+        const adjList = buildUndirectedGraphFromSpecificNodes(activeNodes); 
+
         (adjList[startNodeId] || []).forEach((edge) =>
           H.enqueue( { to: edge.neighborId, weight: edge.weight, from: startNodeId }, edge.weight )
         );
-        while (!H.isEmpty() && visited.size < nodes.length) {
-          const { to: toNodeId, weight, from: fromNodeId, } = H.dequeue().element;
+
+        while (!H.isEmpty() && visited.size < activeNodes.length) {
+          const { to: toNodeId, weight, from: fromNodeId } = H.dequeue().element;
           if (visited.has(toNodeId)) continue;
+          
           visited.add(toNodeId);
           mstEdges.push({ from: fromNodeId, to: toNodeId, weight: weight });
+
           (adjList[toNodeId] || []).forEach((nEdge) => {
             if (!visited.has(nEdge.neighborId))
               H.enqueue( { to: nEdge.neighborId, weight: nEdge.weight, from: toNodeId }, nEdge.weight );
@@ -1198,25 +1462,32 @@
         return mstEdges;
       }
 
-      function kruskalsAlgorithm() {
-        if (nodes.length === 0) return [];
+      function kruskalsAlgorithm(activeNodes) { 
+        if (!activeNodes || activeNodes.length < 2) return []; 
+
         const mstEdges = [];
         const allEdges = [];
-        for (let i = 0; i < nodes.length; i++)
-          for (let j = i + 1; j < nodes.length; j++)
-            allEdges.push({
-              from: nodes[i].id,
-              to: nodes[j].id,
-              weight: getDistance(nodes[i], nodes[j]),
-            });
+
+        for (let i = 0; i < activeNodes.length; i++) {
+            for (let j = i + 1; j < activeNodes.length; j++) {
+                allEdges.push({
+                    from: activeNodes[i].id,
+                    to: activeNodes[j].id,
+                    weight: getDistance(activeNodes[i], activeNodes[j]),
+                });
+            }
+        }
+            
         allEdges.sort((a, b) => a.weight - b.weight);
-        const dsu = new DisjointSetUnion(nodes.map((n) => n.id));
+        
+        const dsu = new DisjointSetUnion(activeNodes.map((n) => n.id)); 
+
         for (const edge of allEdges) {
-          if (dsu.find(edge.from) !== dsu.find(edge.to)) {
-            mstEdges.push(edge);
-            dsu.union(edge.from, edge.to);
-            if (mstEdges.length === nodes.length - 1) break;
-          }
+            if (dsu.find(edge.from) !== dsu.find(edge.to)) {
+                mstEdges.push(edge);
+                dsu.union(edge.from, edge.to);
+                if (activeNodes.length > 0 && mstEdges.length === activeNodes.length - 1) break; 
+            }
         }
         return mstEdges;
       }
@@ -1311,6 +1582,7 @@
         setupEventListeners();
         updateModeDisplay();
         updatePointsListUI();
+        updateViaPointsListUI(); 
       });
     </script>
   </body>
