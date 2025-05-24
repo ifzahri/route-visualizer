@@ -351,51 +351,53 @@
           <div class="grid grid-cols-2 gap-2">
             <div class="mb-3">
               <label
-              for="startNodeSelect"
-              class="block text-xs font-medium text-gray-700 mb-1"
-              >Start Point</label
+                for="startNodeSelect"
+                class="block text-xs font-medium text-gray-700 mb-1"
+                >Start Point</label
               >
-              <select id="startNodeSelect" class="w-full p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"></select>
+              <select
+                id="startNodeSelect"
+                class="w-full p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"
+              ></select>
             </div>
             <div class="mb-4">
               <label
-              for="endNodeSelect"
-              class="block text-xs font-medium text-gray-700 mb-1"
-              >End Point</label
+                for="endNodeSelect"
+                class="block text-xs font-medium text-gray-700 mb-1"
+                >End Point</label
               >
-              <select id="endNodeSelect" class="w-full p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"></select>
+              <select
+                id="endNodeSelect"
+                class="w-full p-2.5 border border-gray-300 rounded-md shadow-sm bg-white hover:bg-gray-50"
+              ></select>
             </div>
           </div>
 
-          <h3 class="subsection-title">
-            Abstract Graph Algorithms
-          </h3>
+          <h3 class="subsection-title">Abstract Graph Algorithms</h3>
           <div class="grid grid-cols-2 gap-2 mb-3">
-            <button id="runDFS" class="btn btn-secondary mb-3">DFS</button>
             <button id="runBFS" class="btn btn-secondary mb-3">BFS</button>
-            <button id="runAStar" class="btn btn-secondary mb-3">A*</button>
-            <button id="runDAGSP" class="btn btn-secondary mb-3">Directed Acrylic Graph</button>
+            <button id="runDAGSP" class="btn btn-secondary mb-3">
+              Directed Acrylic Graph
+            </button>
           </div>
-          
-          <h3 class="subsection-title">
-            Minimum Spanning Tree
-          </h3>
+
+          <h3 class="subsection-title">Minimum Spanning Tree</h3>
           <div class="grid grid-cols-2 gap-2">
             <button id="runPrims" class="btn btn-secondary mb-3">Prim's</button>
-            <button id="runKruskals" class="btn btn-secondary mb-3">Kruskal's</button>
+            <button id="runKruskals" class="btn btn-secondary mb-3">
+              Kruskal's
+            </button>
           </div>
-          
-          <h3 class="subsection-title">
-            Road Network Algorithm
-          </h3>
+
+          <h3 class="subsection-title">Road Network Algorithm</h3>
           <button id="runRoadRoute" class="btn btn-secondary mb-3">
             Find Road Route
           </button>
         </div>
 
         <div class="control-card">
-            <h2 class="section-title">Results & Comparison</h2>
-            <div id="resultsDisplay" class="text-sm space-y-2"></div>
+          <h2 class="section-title">Results & Comparison</h2>
+          <div id="resultsDisplay" class="text-sm space-y-2"></div>
         </div>
       </div>
     </main>
@@ -412,9 +414,7 @@
       let searchTimeout = null;
 
       const algorithmColors = {
-        DFS: "#ef4444",
         BFS: "#3b82f6",
-        ASTAR: "#22c55e",
         DAG_SP: "#ec4899",
         PRIMS: "#f97316",
         KRUSKALS: "#8b5cf6",
@@ -472,14 +472,8 @@
       });
       resetPointsBtn.addEventListener("click", resetAll);
       document
-        .getElementById("runDFS")
-        .addEventListener("click", () => runPathfindingSequential("DFS"));
-      document
         .getElementById("runBFS")
         .addEventListener("click", () => runPathfindingSequential("BFS"));
-      document
-        .getElementById("runAStar")
-        .addEventListener("click", () => runPathfindingSequential("ASTAR"));
       document
         .getElementById("runDAGSP")
         .addEventListener("click", () => runPathfindingSequential("DAG_SP"));
@@ -575,7 +569,7 @@
             if (latDiff < 0.0001 && lonDiff < 0.0001 && lat && lon)
               map.setView([lat, lon], 15);
             else map.fitBounds(bounds);
-            showMessage(`Navigated to: ${targetLi.textContent}`, "success");
+            showMessage(`Mapsd to: ${targetLi.textContent}`, "success");
           } catch (e) {
             console.error("Error processing suggestion data:", e);
             if (lat && lon) map.setView([lat, lon], 13);
@@ -606,8 +600,11 @@
 
       // --- Mode & Point Management ---
       function updateModeDisplay() {
-        currentModeDisplay.textContent =
-          currentMode === "addPoint" ? "Add Points" : "N/A";
+        // currentModeDisplay is not defined in the provided HTML, if it were, this would update it.
+        // For now, the button text serves as the mode indicator.
+        addPointModeBtn.textContent = `Mode: ${
+          currentMode === "addPoint" ? "Add Points" : "N/A"
+        }`;
       }
 
       function handleMapClick(e) {
@@ -672,14 +669,14 @@
             : nodes
                 .map(
                   (n) => `
-                    <li class="points-list-item" data-node-id="${n.id}">
-                        <span>${n.name}: (${n.lat.toFixed(3)}, ${n.lng.toFixed(
+                  <li class="points-list-item" data-node-id="${n.id}">
+                      <span>${n.name}: (${n.lat.toFixed(3)}, ${n.lng.toFixed(
                     3
                   )})</span>
-                        <button class="btn-remove-point" data-remove-id="${
-                          n.id
-                        }" title="Remove ${n.name}">×</button>
-                    </li>
+                      <button class="btn-remove-point" data-remove-id="${
+                        n.id
+                      }" title="Remove ${n.name}">×</button>
+                  </li>
                 `
                 )
                 .join("");
@@ -787,7 +784,7 @@
         const latLng2 = L.latLng(node2.lat, node2.lng);
         return latLng1.distanceTo(latLng2);
       }
-      function getHeuristicDistance(node1, node2) {
+      function getHeuristicDistance(node1, node2) { // Kept for potential future A* like algorithms
         return getDistance(node1, node2);
       }
       function buildUndirectedGraphFromAllNodes() {
@@ -836,7 +833,7 @@
           color: color,
           weight: 5,
           opacity: 0.75,
-          dashArray: "1,0",
+          dashArray: "1,0", // Solid line
         }).addTo(drawnPathLayers);
         let segmentLength = 0;
         for (let i = 0; i < pathNodeIds.length - 1; i++) {
@@ -954,14 +951,8 @@
           if (segmentStartId === segmentEndId) continue;
 
           switch (algorithm) {
-            case "DFS":
-              segmentPath = dfs(graph, segmentStartId, segmentEndId);
-              break;
             case "BFS":
               segmentPath = bfs(graph, segmentStartId, segmentEndId);
-              break;
-            case "ASTAR":
-              segmentPath = aStar(graph, segmentStartId, segmentEndId);
               break;
             case "DAG_SP":
               segmentPath = dagShortestPathAlgorithm(
@@ -1082,25 +1073,7 @@
           .addTo(map);
       }
 
-      // --- DFS, BFS, A*, DAG_SP, MST Algorithms & Helpers ---
-      function dfs(graph, startId, endId) {
-        const visited = new Set();
-        const stack = [[startId, [startId]]];
-        while (stack.length > 0) {
-          const [currentId, path] = stack.pop();
-          if (currentId === endId) return path;
-          if (!visited.has(currentId)) {
-            visited.add(currentId);
-            const neighbors = graph[currentId] || [];
-            for (let i = neighbors.length - 1; i >= 0; i--) {
-              const n = neighbors[i];
-              if (!visited.has(n.neighborId))
-                stack.push([n.neighborId, [...path, n.neighborId]]);
-            }
-          }
-        }
-        return null;
-      }
+      // --- BFS, DAG_SP, MST Algorithms & Helpers ---
       function bfs(graph, startId, endId) {
         const visited = new Set();
         const queue = [[startId, [startId]]];
@@ -1118,54 +1091,9 @@
         }
         return null;
       }
-      function aStar(graph, startId, endId) {
-        const openSet = new PriorityQueue();
-        openSet.enqueue(startId, 0);
-        const cameFrom = {};
-        const gScore = {};
-        nodes.forEach((n) => (gScore[n.id] = Infinity));
-        gScore[startId] = 0;
-        const fScore = {};
-        nodes.forEach((n) => (fScore[n.id] = Infinity));
-        const sNode = nodes.find((n) => n.id === startId);
-        const eNode = nodes.find((n) => n.id === endId);
-        if (!sNode || !eNode) return null;
-        fScore[startId] = getHeuristicDistance(sNode, eNode);
-        while (!openSet.isEmpty()) {
-          const currentId = openSet.dequeue().element;
-          if (currentId === endId) return reconstructPath(cameFrom, currentId);
-          const neighbors = (graph[currentId] || [])
-            .slice()
-            .sort((a, b) => a.weight - b.weight);
-          for (const edge of neighbors) {
-            const neighborId = edge.neighborId;
-            const tentative_gScore = gScore[currentId] + edge.weight;
-            if (tentative_gScore < gScore[neighborId]) {
-              cameFrom[neighborId] = currentId;
-              gScore[neighborId] = tentative_gScore;
-              const neighNode = nodes.find((n) => n.id === neighborId);
-              if (!neighNode) continue;
-              fScore[neighborId] =
-                gScore[neighborId] + getHeuristicDistance(neighNode, eNode);
-              if (!openSet.contains(neighborId))
-                openSet.enqueue(neighborId, fScore[neighborId]);
-              else openSet.updatePriority(neighborId, fScore[neighborId]);
-            }
-          }
-        }
-        return null;
-      }
-      function reconstructPath(cameFrom, currentId) {
-        const totalPath = [currentId];
-        while (cameFrom[currentId]) {
-          currentId = cameFrom[currentId];
-          totalPath.unshift(currentId);
-        }
-        return totalPath;
-      }
       function topologicalSort(adj, inDegree, nodeIdsSet) {
         const q = [];
-        const localInDegree = JSON.parse(JSON.stringify(inDegree));
+        const localInDegree = JSON.parse(JSON.stringify(inDegree)); // Deep copy
         nodeIdsSet.forEach((nodeId) => {
           if (localInDegree[nodeId] === 0) q.push(nodeId);
         });
@@ -1211,16 +1139,16 @@
             }
           });
         }
-        if (dist[endNodeId] === Infinity) return null;
+        if (dist[endNodeId] === Infinity) return null; // No path
         const path = [];
         let curr = endNodeId;
         while (curr !== null) {
           path.unshift(curr);
-          if (curr === startNodeId) break;
+          if (curr === startNodeId) break; // Path reconstructed
           curr = prev[curr];
-          if (curr === null && path[0] !== startNodeId) return null;
+          if (curr === null && path[0] !== startNodeId) return null; // Should not happen if path exists
         }
-        return path[0] === startNodeId ? path : null;
+        return path[0] === startNodeId ? path : null; // Ensure path starts correctly
       }
       function runMST(algorithm) {
         if (nodes.length < 2) {
@@ -1245,7 +1173,7 @@
         if (nodes.length === 0) return [];
         const mstEdges = [];
         const visited = new Set();
-        const H = new PriorityQueue();
+        const H = new PriorityQueue(); // Min-priority queue
         const startNodeId = nodes[0].id;
         visited.add(startNodeId);
         const adjList = buildUndirectedGraphFromAllNodes();
@@ -1307,13 +1235,14 @@
         }
         find(el) {
           if (this.parent[el] !== el)
-            this.parent[el] = this.find(this.parent[el]);
+            this.parent[el] = this.find(this.parent[el]); // Path compression
           return this.parent[el];
         }
         union(el1, el2) {
           const r1 = this.find(el1);
           const r2 = this.find(el2);
           if (r1 !== r2) {
+            // Union by rank
             if (this.rank[r1] < this.rank[r2]) this.parent[r1] = r2;
             else if (this.rank[r1] > this.rank[r2]) this.parent[r2] = r1;
             else {
@@ -1348,17 +1277,17 @@
         isEmpty() {
           return this.items.length === 0;
         }
-        contains(element) {
-          return this.items.some((item) => item.element === element);
+        contains(element) { // Needed for some A* implementations, kept for now
+            return this.items.some(item => item.element === element);
         }
-        updatePriority(element, newPriority) {
-          for (let i = 0; i < this.items.length; i++) {
-            if (this.items[i].element === element) {
-              this.items.splice(i, 1);
-              this.enqueue(element, newPriority);
-              return;
+        updatePriority(element, newPriority) { // Needed for some A* implementations
+            for (let i = 0; i < this.items.length; i++) {
+                if (this.items[i].element === element) {
+                    this.items.splice(i, 1);
+                    this.enqueue(element, newPriority);
+                    return;
+                }
             }
-          }
         }
       }
 
