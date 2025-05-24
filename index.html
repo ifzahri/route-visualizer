@@ -25,187 +25,213 @@
     <style>
       body {
         font-family: "Inter", sans-serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        background-color: #f3f4f6;
+        background-color: #f4f7f6; /* Light greenish-gray background */
+        overflow-x: hidden;
       }
 
-      .map-container {
-        position: relative; /* For positioning search overlay */
-        height: 60vh;
-        width: 100%;
-        margin-bottom: 1rem;
+      .header {
+        background-color: white;
+        padding: 1rem 2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1f2937;
       }
+
+      .main-content {
+        display: flex;
+        flex-direction: column; /* Default for mobile */
+        padding: 1rem;
+        gap: 1rem;
+        flex-grow: 1; /* Allow main content to fill space */
+      }
+
+      @media (min-width: 1024px) {
+        /* lg breakpoint */
+        .main-content {
+          flex-direction: row;
+        }
+      }
+
+      .map-column {
+        flex-basis: 100%; /* Full width on mobile */
+        position: relative; /* For search overlay */
+      }
+      @media (min-width: 1024px) {
+        /* lg breakpoint */
+        .map-column {
+          flex-basis: 65%; /* 65% width on large screens */
+        }
+      }
+
       #map {
-        height: 100%;
+        height: 75vh; /* Increased map height */
         width: 100%;
-        border-radius: 0.5rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border-radius: 0.75rem; /* More rounded map */
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
       }
       .leaflet-container {
         background: #e5e7eb;
+        border-radius: 0.75rem;
       }
 
       /* Search Overlay Styles */
       #searchOverlay {
         position: absolute;
-        top: 1rem;
+        top: 1.5rem; /* Slightly more padding from top */
         left: 50%;
         transform: translateX(-50%);
-        z-index: 1000; /* Above map, below popups if any */
+        z-index: 1000;
         width: 90%;
-        max-width: 500px;
+        max-width: 450px; /* Slightly narrower */
       }
       #locationSearchInputContainer {
         display: flex;
+        align-items: center; /* Vertically align items */
         background-color: white;
         border-radius: 0.5rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        overflow: hidden; /* Ensures child corners are also rounded */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        padding-left: 0.75rem; /* Space for potential icon */
       }
       #locationSearchInput {
         flex-grow: 1;
         border: none;
-        padding: 0.75rem 1rem;
-        font-size: 1rem;
+        padding: 0.875rem 0.75rem; /* Adjusted padding */
+        font-size: 0.9375rem; /* Slightly smaller font */
         outline: none;
+        background-color: transparent;
       }
-      #searchLocationBtn {
-        /* Optional: if you want a button next to input */
-        padding: 0.75rem 1rem;
-        background-color: #3b82f6;
-        color: white;
-        border: none;
-        cursor: pointer;
-      }
+      /* Placeholder for a search icon if needed */
+      /* #locationSearchInputContainer::before { content: '🔍'; margin-right: 0.5rem; color: #9ca3af; } */
+
       #searchSuggestions {
         list-style: none;
         padding: 0;
         margin: 0.5rem 0 0 0;
         background-color: white;
         border-radius: 0.5rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        max-height: 200px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        max-height: 220px; /* Increased max height */
         overflow-y: auto;
       }
       #searchSuggestions li {
-        padding: 0.75rem 1rem;
+        padding: 0.875rem 1rem;
         cursor: pointer;
-        border-bottom: 1px solid #f3f4f6;
+        border-bottom: 1px solid #f0f0f0; /* Lighter border */
+        font-size: 0.875rem;
       }
       #searchSuggestions li:last-child {
         border-bottom: none;
       }
       #searchSuggestions li:hover {
-        background-color: #f3f4f6;
+        background-color: #f9fafb;
       }
       /* End Search Overlay Styles */
 
-      .controls-container {
-        padding: 1rem;
-        background-color: #f9fafb;
-        border-top: 1px solid #e5e7eb;
-        overflow-y: auto;
-        flex-grow: 1;
+      .controls-column {
+        flex-basis: 100%; /* Full width on mobile */
+        overflow-y: auto; /* Scroll if content overflows */
+        max-height: calc(
+          100vh - 4rem - 2rem
+        ); /* Adjust based on header and padding */
+        padding-right: 0.5rem; /* Space for scrollbar */
+      }
+      @media (min-width: 1024px) {
+        /* lg breakpoint */
+        .controls-column {
+          flex-basis: 35%; /* 35% width on large screens */
+        }
       }
 
       .control-card {
         background-color: white;
         border-radius: 0.75rem;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-          0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        margin-bottom: 1rem;
+        padding: 1.25rem; /* Slightly reduced padding */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07),
+          0 2px 4px -1px rgba(0, 0, 0, 0.04);
+        margin-bottom: 1.25rem;
       }
 
       .btn {
-        padding: 0.625rem 1.25rem;
-        border-radius: 0.5rem;
+        padding: 0.625rem 1.125rem;
+        border-radius: 0.375rem; /* Less rounded for a slightly sharper look */
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        margin: 0.25rem;
+        transition: all 0.15s ease-in-out;
+        margin: 0.25rem 0; /* Vertical margin */
         border: 1px solid transparent;
         text-align: center;
+        display: block; /* Make buttons block for full width */
+        width: 100%;
       }
       .btn:focus {
         outline: none;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
       }
 
       .btn-primary {
-        background-color: #3b82f6;
-        color: white;
-      }
-      .btn-primary:hover {
         background-color: #2563eb;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        color: white;
+      } /* Slightly darker blue */
+      .btn-primary:hover {
+        background-color: #1d4ed8;
       }
 
       .btn-secondary {
-        background-color: #10b981;
-        color: white;
-      }
-      .btn-secondary:hover {
         background-color: #059669;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        color: white;
+      } /* Slightly darker green */
+      .btn-secondary:hover {
+        background-color: #047857;
       }
-
-      /* .btn-info class removed as search button is integrated or can be styled within searchOverlay */
 
       .btn-danger {
-        background-color: #ef4444;
-        color: white;
-      }
-      .btn-danger:hover {
         background-color: #dc2626;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        color: white;
+      } /* Slightly darker red */
+      .btn-danger:hover {
+        background-color: #b91c1c;
       }
 
       .btn-outline {
-        border-color: #d1d5db;
-        color: #374151;
+        border-color: #cbd5e1;
+        color: #334155;
         background-color: white;
-      }
+      } /* Slate colors */
       .btn-outline:hover {
-        background-color: #f3f4f6;
-        border-color: #9ca3af;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        background-color: #f1f5f9;
+        border-color: #94a3b8;
       }
 
       .btn-remove-point {
-        background-color: #fee2e2;
-        color: #b91c1c;
+        background-color: transparent;
+        color: #ef4444;
         padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        border-radius: 0.25rem;
+        font-size: 1rem; /* Larger X */
+        font-weight: bold;
+        border-radius: 9999px; /* Circle */
         margin-left: 0.5rem;
+        line-height: 1;
+        width: auto; /* Override block for this specific button */
+        display: inline-block;
       }
       .btn-remove-point:hover {
-        background-color: #fecaca;
-        color: #991b1b;
+        background-color: #fee2e2;
+        color: #dc2626;
       }
 
       select {
-        /* Select specific styling */
         padding: 0.625rem;
-        border-radius: 0.5rem;
-        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        border: 1px solid #cbd5e1;
         margin: 0.25rem 0;
         width: 100%;
         box-sizing: border-box;
-        background-color: white; /* Ensure select background is white */
+        background-color: white;
       }
       select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        border-color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
         outline: none;
       }
 
@@ -213,17 +239,17 @@
         padding: 0.75rem;
         margin-bottom: 0.75rem;
         border-radius: 0.5rem;
-        border: 1px solid #e5e7eb;
-        background-color: #f9fafb;
+        border: 1px solid #e2e8f0; /* Lighter border */
+        background-color: #f8fafc; /* Very light gray */
         display: flex;
         align-items: center;
+        font-size: 0.875rem;
       }
       .color-box {
         display: inline-block;
-        width: 1.25em;
-        height: 1.25em;
-        margin-right: 0.75em;
-        vertical-align: middle;
+        width: 1.125em;
+        height: 1.125em;
+        margin-right: 0.625em;
         border: 1px solid #d1d5db;
         border-radius: 0.25rem;
       }
@@ -236,7 +262,7 @@
         border-radius: 0.5rem;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
           0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        z-index: 10001; /* Above search overlay */
+        z-index: 10001;
         opacity: 0;
         transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
         pointer-events: none;
@@ -252,86 +278,86 @@
         overflow-y: auto;
         border-radius: 0.375rem;
         border: 1px solid #e5e7eb;
+        font-size: 0.875rem;
       }
       .section-title {
-        font-size: 1.25rem;
+        font-size: 1.125rem; /* text-lg */
         font-weight: 600;
-        margin-bottom: 0.75rem;
-        color: #1f2937;
+        margin-bottom: 1rem;
+        color: #1e293b; /* Slate 800 */
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0.5rem;
       }
       .subsection-title {
-        font-size: 1rem;
+        font-size: 0.9375rem; /* Between sm and base */
         font-weight: 500;
         margin-top: 1rem;
-        margin-bottom: 0.25rem;
-        color: #4b5563;
+        margin-bottom: 0.5rem;
+        color: #475569; /* Slate 600 */
       }
       .points-list-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 0.25rem 0;
+        padding: 0.375rem 0.25rem; /* Adjusted padding */
+        font-size: 0.875rem;
+        border-bottom: 1px dashed #e2e8f0;
+      }
+      .points-list-item:last-child {
+        border-bottom: none;
       }
     </style>
   </head>
-  <body class="bg-gray-100">
+  <body class="h-screen flex flex-col">
+    <header class="header">Route Algorithm Visualizer</header>
+
     <div id="messageBox"></div>
 
-    <div class="map-container m-4">
-      <div id="map"></div>
-      <div id="searchOverlay">
-        <div id="locationSearchInputContainer">
-          <input
-            type="text"
-            id="locationSearchInput"
-            placeholder="Search city or place..."
-            class="w-full"
-          />
+    <main class="main-content">
+      <div class="map-column">
+        <div id="map"></div>
+        <div id="searchOverlay">
+          <div id="locationSearchInputContainer">
+            <input
+              type="text"
+              id="locationSearchInput"
+              placeholder="Search for a location..."
+              class="w-full"
+            />
+          </div>
+          <ul id="searchSuggestions" class="hidden"></ul>
         </div>
-        <ul id="searchSuggestions" class="hidden"></ul>
       </div>
-    </div>
 
-    <div class="controls-container">
-      <div
-        class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-      >
-
+      <div class="controls-column">
         <div class="control-card">
-          <h2 class="section-title">1. Manage Points</h2>
-          <button id="addPointMode" class="btn btn-primary w-full mb-3">
+          <h2 class="section-title">Route Configuration</h2>
+          <button id="addPointMode" class="btn btn-primary mb-3">
             Mode: Add Points
           </button>
-          <button id="resetPoints" class="btn btn-danger w-full mb-3">
+          <div class="text-xs text-gray-500 mb-3">
+            Current mode:
+            <span id="currentModeDisplay" class="font-semibold text-gray-700"
+              >Add Points</span
+            >
+          </div>
+
+          <h3 class="subsection-title mb-2">Placed Points:</h3>
+          <ul
+            id="pointsList"
+            class="text-sm text-gray-700 max-h-48 overflow-y-auto space-y-1 pr-2 mb-3"
+          ></ul>
+          <button id="resetPoints" class="btn btn-danger">
             Clear All Points & Paths
           </button>
-          <div class="mt-2 text-sm text-gray-600">
-            <p>
-              Click map to add points. Paths will follow sequence between
-              Start/End.
-            </p>
-            <p class="mt-1">
-              Current mode:
-              <span id="currentModeDisplay" class="font-semibold text-gray-700"
-                >Add Points</span
-              >
-            </p>
-          </div>
-          <div class="mt-5">
-            <h3 class="subsection-title mb-2">Placed Points:</h3>
-            <ul
-              id="pointsList"
-              class="text-sm text-gray-700 max-h-40 overflow-y-auto space-y-1 pr-2"
-            ></ul>
-          </div>
         </div>
 
         <div class="control-card">
-          <h2 class="section-title">2. Pathfinding (Sequential)</h2>
-          <div class="mb-4">
+          <h2 class="section-title">Algorithm Execution</h2>
+          <div class="mb-3">
             <label
               for="startNodeSelect"
-              class="block text-sm font-medium text-gray-700 mb-1"
+              class="block text-xs font-medium text-gray-700 mb-1"
               >Start Point for Sequence:</label
             >
             <select id="startNodeSelect" class="w-full"></select>
@@ -339,56 +365,49 @@
           <div class="mb-4">
             <label
               for="endNodeSelect"
-              class="block text-sm font-medium text-gray-700 mb-1"
+              class="block text-xs font-medium text-gray-700 mb-1"
               >End Point for Sequence:</label
             >
             <select id="endNodeSelect" class="w-full"></select>
           </div>
+
           <h3 class="subsection-title">
             Abstract Graph Algorithms
             <span class="text-xs text-gray-500"
               >(Straight Lines per Segment)</span
-            >:
+            >
           </h3>
-          <button id="runDFS" class="btn btn-outline w-full mb-2">
-            Run DFS (Sequential)
-          </button>
-          <button id="runBFS" class="btn btn-outline w-full mb-2">
-            Run BFS (Sequential)
-          </button>
-          <button id="runAStar" class="btn btn-outline w-full mb-2">
-            Run A* (Sequential)
-          </button>
-          <button id="runDAGSP" class="btn btn-outline w-full">
-            Run DAG Shortest Path
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <button id="runDFS" class="btn btn-outline">DFS</button>
+            <button id="runBFS" class="btn btn-outline">BFS</button>
+            <button id="runAStar" class="btn btn-outline">A*</button>
+            <button id="runDAGSP" class="btn btn-outline">DAG SP</button>
+          </div>
+
+          <h3 class="subsection-title">
+            Road Network Algorithm
+            <span class="text-xs text-gray-500">(Sequential)</span>
+          </h3>
+          <button id="runRoadRoute" class="btn btn-secondary mb-3">
+            Find Road Route
           </button>
 
-          <h3 class="subsection-title mt-5">
-            Road Network Algorithm
-            <span class="text-xs text-gray-500">(Sequential)</span>:
+          <h3 class="subsection-title">
+            Minimum Spanning Tree
+            <span class="text-xs text-gray-500">(All Points)</span>
           </h3>
-          <button id="runRoadRoute" class="btn btn-secondary w-full">
-            Find Road Route (Sequential)
-          </button>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="runPrims" class="btn btn-outline">Prim's</button>
+            <button id="runKruskals" class="btn btn-outline">Kruskal's</button>
+          </div>
         </div>
 
         <div class="control-card">
-          <h2 class="section-title">
-            3. Minimum Spanning Tree
-            <span class="text-xs text-gray-500">(All Points)</span>
-          </h2>
-          <button id="runPrims" class="btn btn-outline w-full mb-2">
-            Run Prim's Algorithm
-          </button>
-          <button id="runKruskals" class="btn btn-outline w-full mb-4">
-            Run Kruskal's Algorithm
-          </button>
-
-          <h2 class="section-title mt-5">Results & Comparison</h2>
-          <div id="resultsDisplay" class="text-sm space-y-3"></div>
+          <h2 class="section-title">Results & Comparison</h2>
+          <div id="resultsDisplay" class="text-sm space-y-2"></div>
         </div>
       </div>
-    </div>
+    </main>
 
     <script>
       // --- Global Variables ---
@@ -399,7 +418,7 @@
       let nextNodeId = 1;
       let lrmControl = null;
       const messageBox = document.getElementById("messageBox");
-      let searchTimeout = null; // For debouncing search input
+      let searchTimeout = null;
 
       const algorithmColors = {
         DFS: "#ef4444",
@@ -420,7 +439,6 @@
         }).addTo(map);
         drawnPathLayers.addTo(map);
         map.on("click", handleMapClick);
-        // Hide suggestions when clicking outside search area
         map.on("click", () =>
           document.getElementById("searchSuggestions").classList.add("hidden")
         );
@@ -432,7 +450,6 @@
       );
       const searchSuggestionsList =
         document.getElementById("searchSuggestions");
-      // const searchLocationBtn = document.getElementById('searchLocationBtn'); // No longer a separate button by default
       const addPointModeBtn = document.getElementById("addPointMode");
       const resetPointsBtn = document.getElementById("resetPoints");
       const currentModeDisplay = document.getElementById("currentModeDisplay");
@@ -444,12 +461,10 @@
       // --- Event Listeners ---
       locationSearchInput.addEventListener("input", handleSearchInput);
       locationSearchInput.addEventListener("focus", () => {
-        // Show suggestions if there's text, could be improved
         if (locationSearchInput.value.trim().length > 2)
           fetchSearchSuggestions();
       });
       searchSuggestionsList.addEventListener("click", handleSuggestionClick);
-      // Hide suggestions when focus leaves the entire search overlay (input + suggestions)
       document
         .getElementById("searchOverlay")
         .addEventListener("focusout", (e) => {
@@ -493,24 +508,22 @@
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
           fetchSearchSuggestions();
-        }, 300); // Debounce for 300ms
+        }, 300);
       }
 
       async function fetchSearchSuggestions() {
         const query = locationSearchInput.value.trim();
         if (query.length < 3) {
-          // Minimum characters to trigger search
           searchSuggestionsList.innerHTML = "";
           searchSuggestionsList.classList.add("hidden");
           return;
         }
-        // showMessage("Searching suggestions...", "info", 1000); // Can be noisy
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
               query
-            )}&limit=5`
-          ); // Limit to 5 suggestions
+            )}&limit=5&addressdetails=1`
+          );
           if (!response.ok) {
             throw new Error(`Nominatim API error: ${response.statusText}`);
           }
@@ -532,7 +545,7 @@
             li.textContent = place.display_name;
             li.dataset.lat = place.lat;
             li.dataset.lon = place.lon;
-            li.dataset.boundingbox = JSON.stringify(place.boundingbox); // Store bounding box
+            li.dataset.boundingbox = JSON.stringify(place.boundingbox);
             searchSuggestionsList.appendChild(li);
           });
           searchSuggestionsList.classList.remove("hidden");
@@ -543,21 +556,44 @@
 
       function handleSuggestionClick(event) {
         if (event.target.tagName === "LI") {
+          event.stopPropagation();
           const targetLi = event.target;
           const lat = parseFloat(targetLi.dataset.lat);
           const lon = parseFloat(targetLi.dataset.lon);
-          const boundingbox = JSON.parse(targetLi.dataset.boundingbox);
+          const boundingboxString = targetLi.dataset.boundingbox;
 
-          const bounds = [
-            [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])], // Southwest
-            [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])], // Northeast
-          ];
-          map.fitBounds(bounds);
+          if (!boundingboxString) {
+            console.error("Bounding box data is missing for this suggestion.");
+            if (lat && lon) map.setView([lat, lon], 13); // Fallback to point
+            showMessage("Navigated to point (no bounding box).", "info");
+            return;
+          }
 
-          showMessage(`Navigated to: ${targetLi.textContent}`, "success");
-          locationSearchInput.value = ""; // Clear input
-          searchSuggestionsList.innerHTML = ""; // Clear suggestions
-          searchSuggestionsList.classList.add("hidden");
+          try {
+            const boundingbox = JSON.parse(boundingboxString);
+            if (!Array.isArray(boundingbox) || boundingbox.length !== 4) {
+              if (lat && lon) map.setView([lat, lon], 13);
+              throw new Error("Invalid bounding box format");
+            }
+            const bounds = [
+              [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])],
+              [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])],
+            ];
+            const latDiff = Math.abs(bounds[1][0] - bounds[0][0]);
+            const lonDiff = Math.abs(bounds[1][1] - bounds[0][1]);
+            if (latDiff < 0.0001 && lonDiff < 0.0001 && lat && lon)
+              map.setView([lat, lon], 15);
+            else map.fitBounds(bounds);
+            showMessage(`Navigated to: ${targetLi.textContent}`, "success");
+          } catch (e) {
+            console.error("Error processing suggestion data:", e);
+            if (lat && lon) map.setView([lat, lon], 13);
+            showMessage("Error navigating. Displaying point.", "error");
+          } finally {
+            locationSearchInput.value = "";
+            searchSuggestionsList.innerHTML = "";
+            searchSuggestionsList.classList.add("hidden");
+          }
         }
       }
 
@@ -584,7 +620,6 @@
       }
 
       function handleMapClick(e) {
-        // Prevent adding point if click was on search overlay elements
         if (
           document
             .getElementById("searchOverlay")
@@ -592,7 +627,6 @@
         ) {
           return;
         }
-
         if (currentMode === "addPoint") {
           const nodeId = nextNodeId++;
           const nodeName = `P${nodeId}`;
@@ -617,21 +651,7 @@
           clearAllDrawnPathsAndResults();
         }
       }
-      function resetAll() {
-        nodes.forEach((node) => map.removeLayer(node.marker));
-        nodes = [];
-        nextNodeId = 1;
-        clearAllDrawnPathsAndResults();
-        updatePointSelectors();
-        updatePointsListUI();
-        currentMode = "addPoint";
-        updateModeDisplay();
-        locationSearchInput.value = ""; // Clear search input on reset
-        searchSuggestionsList.innerHTML = "";
-        searchSuggestionsList.classList.add("hidden");
-        showMessage("Map and points cleared.", "info");
-      }
-      // (All point management functions like updatePointSelectors, updatePointsListUI, etc. are unchanged from previous version)
+
       function updatePointSelectors() {
         const currentStartVal = startNodeSelect.value;
         const currentEndVal = endNodeSelect.value;
@@ -698,6 +718,20 @@
           lrmControl = null;
         }
         resultsDisplay.innerHTML = "";
+      }
+      function resetAll() {
+        nodes.forEach((node) => map.removeLayer(node.marker));
+        nodes = [];
+        nextNodeId = 1;
+        clearAllDrawnPathsAndResults();
+        updatePointSelectors();
+        updatePointsListUI();
+        currentMode = "addPoint";
+        updateModeDisplay();
+        locationSearchInput.value = "";
+        searchSuggestionsList.innerHTML = "";
+        searchSuggestionsList.classList.add("hidden");
+        showMessage("Map and points cleared.", "info");
       }
 
       // --- Helper: Get Node Sequence for Pathfinding ---
@@ -1057,8 +1091,7 @@
           .addTo(map);
       }
 
-      
-      // (All algorithm implementations and helpers are unchanged from previous correct version)
+      // --- DFS, BFS, A*, DAG_SP, MST Algorithms & Helpers ---
       function dfs(graph, startId, endId) {
         const visited = new Set();
         const stack = [[startId, [startId]]];
