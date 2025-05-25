@@ -248,7 +248,20 @@
         display: flex;
         align-items: center;
         font-size: 0.875rem;
+        cursor: pointer; /* Make result items clickable */
       }
+      .result-item:hover {
+        background-color: #f1f5f9; /* Light hover for result items */
+      }
+      .result-item.path-hidden .color-box {
+        opacity: 0.4;
+        border-style: dashed;
+      }
+      .result-item.path-hidden span:not(.color-box) {
+        text-decoration: line-through;
+        color: #9ca3af;
+      }
+
       .color-box {
         display: inline-block;
         width: 1.125em;
@@ -277,6 +290,23 @@
         pointer-events: auto;
         transform: translateX(-50%) translateY(0);
       }
+      #loadingIndicator {
+        position: fixed;
+        top: 1.5rem;
+        right: 1.5rem;
+        background-color: #1f2937; /* Dark gray */
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 10002; /* Above messageBox */
+        display: none; /* Hidden by default */
+        font-size: 0.875rem;
+      }
+      #loadingIndicator.show {
+        display: block;
+      }
+
       .leaflet-routing-container {
         max-height: 150px;
         overflow-y: auto;
@@ -336,6 +366,7 @@
     <header class="header">Route Algorithm Visualizer</header>
 
     <div id="messageBox"></div>
+    <div id="loadingIndicator">Calculating...</div>
 
     <main class="main-content">
       <div class="map-column">
@@ -435,10 +466,15 @@
           <h3 class="subsection-title mt-4">
             Abstract Graph Algorithms (Sequential)
           </h3>
-          <div class="grid grid-cols-2 gap-2 mb-3">
-            <button id="runBFS" class="btn btn-secondary mb-3">BFS</button>
-            <button id="runDAGSP" class="btn btn-secondary mb-3">
-              Directed Acyclic Graph
+          <div
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3"
+          >
+            <button id="runBFS" class="btn btn-secondary">BFS</button>
+            <button id="runDijkstra" class="btn btn-secondary">
+              Dijkstra's
+            </button>
+            <button id="runDAGSP" class="btn btn-secondary">
+              DAG Shortest Path
             </button>
           </div>
 
@@ -448,8 +484,8 @@
             Otherwise, uses all placed points.
           </p>
           <div class="grid grid-cols-2 gap-2">
-            <button id="runPrims" class="btn btn-secondary mb-3">Prim's</button>
-            <button id="runKruskals" class="btn btn-secondary mb-3">
+            <button id="runPrims" class="btn btn-secondary">Prim's</button>
+            <button id="runKruskals" class="btn btn-secondary">
               Kruskal's
             </button>
           </div>
@@ -459,7 +495,7 @@
             If Via points are selected, uses Start -> Vias -> End. Otherwise,
             routes through all placed points in their original placement order.
           </p>
-          <button id="runRoadRoute" class="btn btn-secondary mb-3">
+          <button id="runRoadRoute" class="btn btn-secondary">
             Find Road Route
           </button>
         </div>
@@ -480,11 +516,16 @@
       let nextNodeId = 1;
       let lrmControl = null;
       const messageBox = document.getElementById("messageBox");
+      const loadingIndicator = document.getElementById("loadingIndicator");
       let searchTimeout = null;
       let selectedViaPoints = []; // Array to store IDs of selected via points
 
+      // Stores visibility state for algorithm paths { ALGORITHM_NAME: true/false }
+      let pathVisibilityState = {};
+
       const algorithmColors = {
         BFS: "#3b82f6",
+        DIJKSTRA: "#10b981", // Teal color for Dijkstra
         DAG_SP: "#ec4899",
         PRIMS: "#f97316",
         KRUSKALS: "#8b5cf6",
@@ -613,6 +654,11 @@
             runSequentialPathfindingAlgorithm("BFS")
           );
         document
+          .getElementById("runDijkstra") // New Dijkstra button
+          .addEventListener("click", () =>
+            runSequentialPathfindingAlgorithm("DIJKSTRA")
+          );
+        document
           .getElementById("runDAGSP")
           .addEventListener("click", () =>
             runSequentialPathfindingAlgorithm("DAG_SP")
@@ -648,13 +694,14 @@
         startNodeSelect.addEventListener("change", () => {
           updateViaPointSelectorOptions();
           clearAllDrawnPathsAndResults();
-          updateAllMarkerIcons(); // Update icons based on new start point
+          updateAllMarkerIcons();
         });
         endNodeSelect.addEventListener("change", () => {
           updateViaPointSelectorOptions();
           clearAllDrawnPathsAndResults();
-          updateAllMarkerIcons(); // Update icons based on new end point
+          updateAllMarkerIcons();
         });
+        resultsDisplay.addEventListener("click", handleResultItemClick);
       }
 
       // --- Location Search with Autocomplete ---
@@ -779,6 +826,14 @@
         setTimeout(() => messageBox.classList.remove("show"), duration);
       }
 
+      function showLoadingIndicator(show) {
+        if (show) {
+          loadingIndicator.classList.add("show");
+        } else {
+          loadingIndicator.classList.remove("show");
+        }
+      }
+
       function updateModeDisplay() {
         addPointModeBtn.textContent = `Mode: ${
           currentMode === "addPoint" ? "Add Points" : "N/A"
@@ -802,7 +857,6 @@
         if (currentMode === "addPoint") {
           const nodeId = nextNodeId++;
           const nodeName = `P${nodeId}`;
-          // Initially add with default icon
           const marker = L.marker(e.latlng, {
             draggable: false,
             icon: defaultIcon,
@@ -825,7 +879,7 @@
           updatePointSelectors();
           updatePointsListUI();
           clearAllDrawnPathsAndResults();
-          updateAllMarkerIcons(); // Update icons after point selectors might have changed start/end
+          updateAllMarkerIcons();
         }
       }
 
@@ -879,7 +933,7 @@
           const nodeId = parseInt(listItem.getAttribute(nodeIdAttr));
           const node = nodes.find((n) => n.id === nodeId);
           if (node && node.marker) {
-            setMarkerIconBasedOnRole(node); // Restore its actual role-based icon
+            setMarkerIconBasedOnRole(node);
           }
         }
       }
@@ -923,13 +977,8 @@
         } else if (nodes.length > 0) {
           endNodeSelect.value = nodes[nodes.length - 1].id;
         }
-        // Programmatic changes to select .value don't fire 'change' events automatically.
-        // So, call updateAllMarkerIcons if these selections might have changed.
-        // However, the 'change' listeners on the selects themselves will call it.
-        // The main concern is if the *default* selection logic here changes start/end.
         updateViaPointSelectorOptions();
         updateViaPointsListUI();
-        // updateAllMarkerIcons(); // Call this to reflect any default changes to start/end markers
       }
 
       function updateViaPointSelectorOptions() {
@@ -1002,7 +1051,7 @@
         updatePointSelectors();
         updatePointsListUI();
         clearAllDrawnPathsAndResults();
-        updateAllMarkerIcons(); // Update icons after removal
+        updateAllMarkerIcons();
         showMessage(`Point ${nodeToRemove.name} removed.`, "info", 2000);
       }
 
@@ -1030,7 +1079,7 @@
         updateViaPointsListUI();
         updateViaPointSelectorOptions();
         clearAllDrawnPathsAndResults();
-        updateAllMarkerIcons(); // Update icons as a point is now a via point
+        updateAllMarkerIcons();
       }
 
       function updateViaPointsListUI() {
@@ -1056,7 +1105,7 @@
           if (node) {
             const li = document.createElement("li");
             li.classList.add("via-points-list-item");
-            li.setAttribute("data-via-node-id", nodeId); // Use setAttribute for data attributes
+            li.setAttribute("data-via-node-id", nodeId);
             li.innerHTML = `
                     <span>${index + 1}. ${node.name}</span>
                     <button class="btn-remove-via-point" data-remove-via-id="${nodeId}" title="Remove ${
@@ -1077,7 +1126,7 @@
           updateViaPointsListUI();
           updateViaPointSelectorOptions();
           clearAllDrawnPathsAndResults();
-          updateAllMarkerIcons(); // Update icons as a point is no longer a via point
+          updateAllMarkerIcons();
         }
       }
 
@@ -1086,7 +1135,7 @@
         updateViaPointsListUI();
         updateViaPointSelectorOptions();
         clearAllDrawnPathsAndResults();
-        updateAllMarkerIcons(); // Update icons as via points are cleared
+        updateAllMarkerIcons();
         showMessage("All via points cleared.", "info");
       }
 
@@ -1097,6 +1146,7 @@
           lrmControl = null;
         }
         resultsDisplay.innerHTML = "";
+        pathVisibilityState = {}; // Reset visibility state
       }
 
       function resetAll() {
@@ -1107,9 +1157,8 @@
         clearAllDrawnPathsAndResults();
         updatePointSelectors();
         updatePointsListUI();
-        // updateAllMarkerIcons(); // Not strictly needed as nodes array is empty, markers are gone
         currentMode = "addPoint";
-        updateModeDisplay(); // This will also reset map cursor
+        updateModeDisplay();
         locationSearchInput.value = "";
         searchSuggestionsList.innerHTML = "";
         searchSuggestionsList.classList.add("hidden");
@@ -1255,7 +1304,7 @@
         }
       }
 
-      function drawPathSegment(pathNodeIds, color) {
+      function drawPathSegment(pathNodeIds, color, algorithmNameForToggle) {
         if (!pathNodeIds || pathNodeIds.length < 2) return 0;
 
         let totalSegmentLength = 0;
@@ -1276,6 +1325,8 @@
               weight: 5,
               opacity: 0.75,
               dashArray: "1,0",
+              // Store algorithm name for toggling
+              algorithmName: algorithmNameForToggle,
             });
 
             const weightText = formatDistance(hopDistance);
@@ -1291,7 +1342,7 @@
         return totalSegmentLength;
       }
 
-      function drawMST(mstEdges, color) {
+      function drawMST(mstEdges, color, algorithmNameForToggle) {
         if (!mstEdges || mstEdges.length === 0) return 0;
         let totalWeight = 0;
         mstEdges.forEach((edge) => {
@@ -1307,6 +1358,8 @@
               weight: 4,
               opacity: 0.7,
               dashArray: "5, 5",
+              // Store algorithm name for toggling
+              algorithmName: algorithmNameForToggle,
             });
 
             const weightText = formatDistance(edge.weight);
@@ -1336,8 +1389,18 @@
           resultItem = document.createElement("div");
           resultItem.id = resultId;
           resultItem.classList.add("result-item");
+          resultItem.dataset.algorithm = algorithmName; // Store algorithm name for click handling
           resultsDisplay.appendChild(resultItem);
         }
+        // Set initial visibility state
+        if (pathVisibilityState[algorithmName] === undefined) {
+          pathVisibilityState[algorithmName] = true; // Default to visible
+        }
+        resultItem.classList.toggle(
+          "path-hidden",
+          !pathVisibilityState[algorithmName]
+        );
+
         const colorBoxHTML = `<span class="color-box" style="background-color:${algorithmColors[algorithmName]};"></span>`;
         const metricType = isPath ? "Total Path Length" : "MST Total Weight";
 
@@ -1368,272 +1431,369 @@
         )}</strong>: <span class="text-gray-600">${metricType}: ${metricDisplay}${additionalInfo}</span></div>`;
       }
 
-      function runSequentialPathfindingAlgorithm(algorithm) {
-        const startId = parseInt(startNodeSelect.value);
-        const endId = parseInt(endNodeSelect.value);
+      async function runSequentialPathfindingAlgorithm(algorithm) {
+        showLoadingIndicator(true);
+        // Use a short timeout to allow the loading indicator to render before heavy computation
+        await new Promise((resolve) => setTimeout(resolve, 50));
 
-        if (nodes.length === 0) {
-          showMessage("Please add points to the map first.", "error");
-          return;
-        }
-        if (isNaN(startId) || isNaN(endId)) {
-          showMessage("Please select valid start and end points.", "error");
-          return;
-        }
+        try {
+          const startId = parseInt(startNodeSelect.value);
+          const endId = parseInt(endNodeSelect.value);
 
-        const waypointSequence = getWaypointSequence(
-          startId,
-          endId,
-          false,
-          selectedViaPoints
-        );
+          if (nodes.length === 0) {
+            showMessage("Please add points to the map first.", "error");
+            return;
+          }
+          if (isNaN(startId) || isNaN(endId)) {
+            showMessage("Please select valid start and end points.", "error");
+            return;
+          }
 
-        if (!waypointSequence) {
-          clearPathsByAlgorithm(algorithm);
-          displayResult(algorithm, 0, "m", true);
-          return;
-        }
-        if (
-          waypointSequence.length === 1 &&
-          startId === endId &&
-          selectedViaPoints.length === 0
-        ) {
-          clearPathsByAlgorithm(algorithm);
-          displayResult(algorithm, 0, "m", true);
-          return;
-        }
-        if (waypointSequence.length < 2) {
-          showMessage(
-            "Sequential path requires at least two distinct points in the final sequence.",
-            "info"
+          const waypointSequence = getWaypointSequence(
+            startId,
+            endId,
+            false,
+            selectedViaPoints
           );
-          clearPathsByAlgorithm(algorithm);
-          displayResult(algorithm, 0, "m", true);
-          return;
-        }
 
-        clearPathsByAlgorithm(algorithm);
-        let graph, dagData, globalTopoOrder;
-        let overallPathLength = 0;
-        let allSegmentsFound = true;
-
-        if (algorithm === "DAG_SP") {
-          dagData = buildDirectedAcyclicGraphFromAllNodes();
-          graph = dagData.adj;
-          globalTopoOrder = topologicalSort(
-            dagData.adj,
-            dagData.inDegree,
-            dagData.nodeIds
-          );
-          if (!globalTopoOrder) {
-            showMessage(
-              "Cannot run DAG algorithm: Graph structure issue.",
-              "error"
-            );
+          if (!waypointSequence) {
+            clearPathsByAlgorithm(algorithm);
             displayResult(algorithm, 0, "m", true);
             return;
           }
-        } else {
-          graph = buildUndirectedGraphFromAllNodes();
-        }
-
-        for (let i = 0; i < waypointSequence.length - 1; i++) {
-          const segmentStartNode = waypointSequence[i];
-          const segmentEndNode = waypointSequence[i + 1];
-          let segmentPathIds = null;
-
-          if (segmentStartNode.id === segmentEndNode.id) continue;
-
-          switch (algorithm) {
-            case "BFS":
-              segmentPathIds = bfs(
-                graph,
-                segmentStartNode.id,
-                segmentEndNode.id
-              );
-              break;
-            case "DAG_SP":
-              segmentPathIds = dagShortestPathAlgorithm(
-                graph,
-                globalTopoOrder,
-                segmentStartNode.id,
-                segmentEndNode.id,
-                dagData.nodeIds
-              );
-              break;
+          if (
+            waypointSequence.length === 1 &&
+            startId === endId &&
+            selectedViaPoints.length === 0
+          ) {
+            clearPathsByAlgorithm(algorithm);
+            displayResult(algorithm, 0, "m", true);
+            return;
           }
-
-          if (segmentPathIds) {
-            overallPathLength += drawPathSegment(
-              segmentPathIds,
-              algorithmColors[algorithm]
-            );
-          } else {
-            allSegmentsFound = false;
+          if (waypointSequence.length < 2) {
             showMessage(
-              `No path found for segment: ${segmentStartNode.name} to ${segmentEndNode.name}.`,
-              "warning",
-              2500
+              "Sequential path requires at least two distinct points in the final sequence.",
+              "info"
+            );
+            clearPathsByAlgorithm(algorithm);
+            displayResult(algorithm, 0, "m", true);
+            return;
+          }
+
+          clearPathsByAlgorithm(algorithm); // Clears old path and its result display
+          pathVisibilityState[algorithm] = true; // Reset visibility to true when re-running
+
+          let graph, dagData, globalTopoOrder;
+          let overallPathLength = 0;
+          let allSegmentsFound = true;
+
+          if (algorithm === "DAG_SP") {
+            dagData = buildDirectedAcyclicGraphFromAllNodes();
+            graph = dagData.adj;
+            globalTopoOrder = topologicalSort(
+              dagData.adj,
+              dagData.inDegree,
+              dagData.nodeIds
+            );
+            if (!globalTopoOrder) {
+              showMessage(
+                "Cannot run DAG algorithm: Graph structure issue.",
+                "error"
+              );
+              displayResult(algorithm, 0, "m", true);
+              return;
+            }
+          } else {
+            graph = buildUndirectedGraphFromAllNodes();
+          }
+
+          for (let i = 0; i < waypointSequence.length - 1; i++) {
+            const segmentStartNode = waypointSequence[i];
+            const segmentEndNode = waypointSequence[i + 1];
+            let segmentPathIds = null;
+            let segmentResult = null; // For Dijkstra
+
+            if (segmentStartNode.id === segmentEndNode.id) continue;
+
+            switch (algorithm) {
+              case "BFS":
+                segmentPathIds = bfs(
+                  graph,
+                  segmentStartNode.id,
+                  segmentEndNode.id
+                );
+                break;
+              case "DIJKSTRA":
+                segmentResult = dijkstraAlgorithm(
+                  graph,
+                  segmentStartNode.id,
+                  segmentEndNode.id,
+                  nodes
+                );
+                if (segmentResult) segmentPathIds = segmentResult.path;
+                break;
+              case "DAG_SP":
+                segmentPathIds = dagShortestPathAlgorithm(
+                  graph,
+                  globalTopoOrder,
+                  segmentStartNode.id,
+                  segmentEndNode.id,
+                  dagData.nodeIds
+                );
+                break;
+            }
+
+            if (segmentPathIds) {
+              overallPathLength += drawPathSegment(
+                segmentPathIds,
+                algorithmColors[algorithm],
+                algorithm
+              );
+            } else {
+              allSegmentsFound = false;
+              showMessage(
+                `No path found for segment: ${segmentStartNode.name} to ${segmentEndNode.name}.`,
+                "warning",
+                2500
+              );
+            }
+          }
+
+          displayResult(algorithm, overallPathLength, "m", true);
+          if (overallPathLength > 0 && allSegmentsFound) {
+            showMessage(
+              `${algorithm.replace(/_/g, " ")}: Sequential path calculated.`,
+              "success"
+            );
+          } else if (overallPathLength > 0 && !allSegmentsFound) {
+            showMessage(
+              `${algorithm.replace(
+                /_/g,
+                " "
+              )}: Sequential path partially calculated. Some segments missing.`,
+              "warning"
+            );
+          } else if (overallPathLength === 0 && waypointSequence.length > 1) {
+            showMessage(
+              `${algorithm.replace(
+                /_/g,
+                " "
+              )}: No segments of the sequential path could be found.`,
+              "error"
             );
           }
-        }
-
-        displayResult(algorithm, overallPathLength, "m", true);
-        if (overallPathLength > 0 && allSegmentsFound) {
-          showMessage(`${algorithm}: Sequential path calculated.`, "success");
-        } else if (overallPathLength > 0 && !allSegmentsFound) {
-          showMessage(
-            `${algorithm}: Sequential path partially calculated. Some segments missing.`,
-            "warning"
-          );
-        } else if (overallPathLength === 0 && waypointSequence.length > 1) {
-          showMessage(
-            `${algorithm}: No segments of the sequential path could be found.`,
-            "error"
-          );
+        } finally {
+          showLoadingIndicator(false);
         }
       }
 
-      function runRoadRouteSequential() {
-        clearPathsByAlgorithm("ROAD_ROUTE");
+      async function runRoadRouteSequential() {
+        showLoadingIndicator(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        try {
+          clearPathsByAlgorithm("ROAD_ROUTE");
+          pathVisibilityState["ROAD_ROUTE"] = true;
 
-        let finalWaypointsForRoute = [];
+          let finalWaypointsForRoute = [];
 
-        if (selectedViaPoints.length > 0) {
-          const startId = parseInt(startNodeSelect.value);
-          const endId = parseInt(endNodeSelect.value);
-          if (isNaN(startId) || isNaN(endId)) {
-            showMessage(
-              "Please select valid Start and End points when using Via Points for Road Route.",
-              "error"
-            );
-            displayResult("ROAD_ROUTE", 0, "m", true);
-            return;
-          }
-          finalWaypointsForRoute = getWaypointSequence(
-            startId,
-            endId,
-            true,
-            selectedViaPoints
-          );
-          if (!finalWaypointsForRoute) {
-            displayResult("ROAD_ROUTE", 0, "m", true);
-            return;
-          }
-        } else {
-          if (nodes.length < 2) {
-            showMessage(
-              "Road Route (all points mode) requires at least two points on the map.",
-              "info"
-            );
-            displayResult("ROAD_ROUTE", 0, "m", true);
-            return;
-          }
-          finalWaypointsForRoute = [...nodes].sort(
-            (a, b) => a.originalIndex - b.originalIndex
-          );
-          showMessage(
-            "Calculating Road Route for all placed points in order.",
-            "info",
-            2500
-          );
-        }
-
-        if (!finalWaypointsForRoute || finalWaypointsForRoute.length < 2) {
-          if (
-            finalWaypointsForRoute &&
-            finalWaypointsForRoute.length === 1 &&
-            selectedViaPoints.length === 0 &&
-            parseInt(startNodeSelect.value) === parseInt(endNodeSelect.value)
-          ) {
-            // This case is fine, start=end, no vias
-          } else if (
-            finalWaypointsForRoute &&
-            finalWaypointsForRoute.length < 2
-          ) {
-            showMessage(
-              "Road Route requires at least two points to form a path in the final sequence.",
-              "info"
-            );
-          }
-          displayResult("ROAD_ROUTE", 0, "m", true);
-          return;
-        }
-
-        const waypointsForLRM = finalWaypointsForRoute.map((node) =>
-          L.latLng(node.lat, node.lng)
-        );
-
-        if (lrmControl) {
-          map.removeControl(lrmControl);
-          lrmControl = null;
-        }
-
-        lrmControl = L.Routing.control({
-          waypoints: waypointsForLRM,
-          routeWhileDragging: false,
-          show: true,
-          addWaypoints: false,
-          lineOptions: {
-            styles: [
-              { color: algorithmColors.ROAD_ROUTE, opacity: 0.8, weight: 7 },
-            ],
-          },
-          createMarker: function () {
-            return null;
-          }, // We use our own markers
-        })
-          .on("routesfound", function (e) {
-            if (e.routes && e.routes.length > 0 && e.routes[0].summary) {
-              displayResult(
-                "ROAD_ROUTE",
-                e.routes[0].summary.totalDistance,
-                "m",
-                true
-              );
-              showMessage("Road route found!", "success", 2000);
-            } else {
+          if (selectedViaPoints.length > 0) {
+            const startId = parseInt(startNodeSelect.value);
+            const endId = parseInt(endNodeSelect.value);
+            if (isNaN(startId) || isNaN(endId)) {
               showMessage(
-                "Road route found but no distance summary or route is invalid.",
+                "Please select valid Start and End points when using Via Points for Road Route.",
+                "error"
+              );
+              displayResult("ROAD_ROUTE", 0, "m", true);
+              return;
+            }
+            finalWaypointsForRoute = getWaypointSequence(
+              startId,
+              endId,
+              true,
+              selectedViaPoints
+            );
+            if (!finalWaypointsForRoute) {
+              displayResult("ROAD_ROUTE", 0, "m", true);
+              return;
+            }
+          } else {
+            if (nodes.length < 2) {
+              showMessage(
+                "Road Route (all points mode) requires at least two points on the map.",
                 "info"
               );
               displayResult("ROAD_ROUTE", 0, "m", true);
+              return;
             }
-          })
-          .on("routingerror", function (e) {
-            console.error("Road Routing error:", e.error);
-            showMessage(
-              `Road routing error: ${
-                e.error.message || "Could not find route."
-              }`,
-              "error"
+            finalWaypointsForRoute = [...nodes].sort(
+              (a, b) => a.originalIndex - b.originalIndex
             );
+            showMessage(
+              "Calculating Road Route for all placed points in order.",
+              "info",
+              2500
+            );
+          }
+
+          if (!finalWaypointsForRoute || finalWaypointsForRoute.length < 2) {
+            if (
+              finalWaypointsForRoute &&
+              finalWaypointsForRoute.length === 1 &&
+              selectedViaPoints.length === 0 &&
+              parseInt(startNodeSelect.value) === parseInt(endNodeSelect.value)
+            ) {
+              // This case is fine, start=end, no vias
+            } else if (
+              finalWaypointsForRoute &&
+              finalWaypointsForRoute.length < 2
+            ) {
+              showMessage(
+                "Road Route requires at least two points to form a path in the final sequence.",
+                "info"
+              );
+            }
             displayResult("ROAD_ROUTE", 0, "m", true);
+            return;
+          }
+
+          const waypointsForLRM = finalWaypointsForRoute.map((node) =>
+            L.latLng(node.lat, node.lng)
+          );
+
+          if (lrmControl) {
+            map.removeControl(lrmControl);
+            lrmControl = null;
+          }
+
+          lrmControl = L.Routing.control({
+            waypoints: waypointsForLRM,
+            routeWhileDragging: false,
+            show: true, // Show the itinerary by default, can be styled/hidden with CSS if needed
+            addWaypoints: false,
+            lineOptions: {
+              styles: [
+                {
+                  color: algorithmColors.ROAD_ROUTE,
+                  opacity: 0.8,
+                  weight: 7,
+                  algorithmName: "ROAD_ROUTE",
+                },
+              ],
+            },
+            createMarker: function () {
+              return null;
+            },
           })
-          .addTo(map);
+            .on("routesfound", function (e) {
+              if (e.routes && e.routes.length > 0 && e.routes[0].summary) {
+                displayResult(
+                  "ROAD_ROUTE",
+                  e.routes[0].summary.totalDistance,
+                  "m",
+                  true
+                );
+                showMessage("Road route found!", "success", 2000);
+              } else {
+                showMessage(
+                  "Road route found but no distance summary or route is invalid.",
+                  "info"
+                );
+                displayResult("ROAD_ROUTE", 0, "m", true);
+              }
+            })
+            .on("routingerror", function (e) {
+              console.error("Road Routing error:", e.error);
+              showMessage(
+                `Road routing error: ${
+                  e.error.message || "Could not find route."
+                }`,
+                "error"
+              );
+              displayResult("ROAD_ROUTE", 0, "m", true);
+            })
+            .addTo(map);
+        } finally {
+          showLoadingIndicator(false);
+        }
       }
 
       function bfs(graph, startId, endId) {
         const visited = new Set();
-        const queue = [[startId, [startId]]];
+        const queue = [[startId, [startId]]]; // Store path along with node
         visited.add(startId);
         while (queue.length > 0) {
           const [currentId, path] = queue.shift();
           if (currentId === endId) return path;
           const neighbors = graph[currentId] || [];
           for (const n of neighbors) {
+            // n is { neighborId, weight }
             if (!visited.has(n.neighborId)) {
               visited.add(n.neighborId);
               queue.push([n.neighborId, [...path, n.neighborId]]);
             }
           }
         }
-        return null;
+        return null; // Path not found
+      }
+
+      function dijkstraAlgorithm(graph, startId, endId, allNodes) {
+        const distances = {};
+        const prev = {};
+        const pq = new PriorityQueue();
+        const visited = new Set(); // To handle disconnected graph segments for path reconstruction
+
+        allNodes.forEach((node) => {
+          distances[node.id] = Infinity;
+          prev[node.id] = null;
+        });
+        distances[startId] = 0;
+        pq.enqueue(startId, 0);
+
+        while (!pq.isEmpty()) {
+          const { element: u, priority: distU } = pq.dequeue();
+
+          if (distU > distances[u]) continue; // Already found a shorter path
+          if (u === endId) break; // Found the shortest path to the end node
+
+          visited.add(u);
+
+          const neighbors = graph[u] || [];
+          for (const edge of neighbors) {
+            const v = edge.neighborId;
+            const weight = edge.weight;
+            if (distances[u] + weight < distances[v]) {
+              distances[v] = distances[u] + weight;
+              prev[v] = u;
+              pq.enqueue(v, distances[v]);
+            }
+          }
+        }
+
+        if (distances[endId] === Infinity) return null; // Path not found
+
+        const path = [];
+        let curr = endId;
+        while (curr !== null) {
+          path.unshift(curr);
+          if (curr === startId) break;
+          curr = prev[curr];
+          // If curr becomes null before reaching startId, and startId wasn't the first element, path is broken.
+          if (curr === null && path[0] !== startId) {
+            console.error(
+              "Dijkstra: Path reconstruction failed, graph might be disconnected or issue in prev pointers."
+            );
+            return null;
+          }
+        }
+        return path[0] === startId
+          ? { path, distance: distances[endId] }
+          : null;
       }
 
       function topologicalSort(adj, inDegreeInput, nodeIdsSet) {
         const q = [];
-        const inDegree = JSON.parse(JSON.stringify(inDegreeInput)); // Deep copy
+        const inDegree = JSON.parse(JSON.stringify(inDegreeInput));
         nodeIdsSet.forEach((nodeId) => {
           if (inDegree[nodeId] === 0) q.push(nodeId);
         });
@@ -1670,7 +1830,7 @@
         });
         dist[startNodeId] = 0;
         for (const u of topoOrder) {
-          if (dist[u] === Infinity || !adj[u]) continue; // Check if adj[u] exists
+          if (dist[u] === Infinity || !adj[u]) continue;
           adj[u].forEach((edge) => {
             const v = edge.neighborId;
             const weight = edge.weight;
@@ -1688,7 +1848,6 @@
           if (curr === startNodeId) break;
           curr = prev[curr];
           if (curr === null && path[0] !== startNodeId) {
-            // Path reconstruction check
             console.error("DAGSP: Path reconstruction failed.");
             return null;
           }
@@ -1696,117 +1855,128 @@
         return path[0] === startNodeId ? path : null;
       }
 
-      function runMST(algorithm) {
-        let activeNodesForMST = [];
-        let operationMode = "all_nodes";
+      async function runMST(algorithm) {
+        showLoadingIndicator(true);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        try {
+          let activeNodesForMST = [];
+          let operationMode = "all_nodes";
 
-        if (selectedViaPoints.length > 0) {
-          const startId = parseInt(startNodeSelect.value);
-          const endId = parseInt(endNodeSelect.value);
+          if (selectedViaPoints.length > 0) {
+            const startId = parseInt(startNodeSelect.value);
+            const endId = parseInt(endNodeSelect.value);
 
-          if (isNaN(startId) || isNaN(endId)) {
-            showMessage(
-              "Please select Start and End points when using Via Points for MST.",
-              "error"
-            );
-            return;
-          }
-          const startNode = nodes.find((n) => n.id === startId);
-          const endNode = nodes.find((n) => n.id === endId);
+            if (isNaN(startId) || isNaN(endId)) {
+              showMessage(
+                "Please select Start and End points when using Via Points for MST.",
+                "error"
+              );
+              return;
+            }
+            const startNode = nodes.find((n) => n.id === startId);
+            const endNode = nodes.find((n) => n.id === endId);
 
-          if (!startNode || !endNode) {
-            showMessage(
-              "Start or End point not found. Please ensure they are selected.",
-              "error"
-            );
-            return;
-          }
+            if (!startNode || !endNode) {
+              showMessage(
+                "Start or End point not found. Please ensure they are selected.",
+                "error"
+              );
+              return;
+            }
 
-          const nodeIdSet = new Set();
-          if (startNode) nodeIdSet.add(startNode.id);
-          selectedViaPoints.forEach((id) => nodeIdSet.add(id));
-          if (endNode) nodeIdSet.add(endNode.id);
+            const nodeIdSet = new Set();
+            if (startNode) nodeIdSet.add(startNode.id);
+            selectedViaPoints.forEach((id) => nodeIdSet.add(id));
+            if (endNode) nodeIdSet.add(endNode.id);
 
-          activeNodesForMST = Array.from(nodeIdSet)
-            .map((id) => nodes.find((n) => n.id === id))
-            .filter(Boolean);
-          operationMode = "subset_nodes";
+            activeNodesForMST = Array.from(nodeIdSet)
+              .map((id) => nodes.find((n) => n.id === id))
+              .filter(Boolean);
+            operationMode = "subset_nodes";
 
-          if (activeNodesForMST.length < 2) {
-            showMessage(
-              `MST on subset requires at least two unique points. Found ${activeNodesForMST.length}.`,
-              "info"
-            );
-            clearPathsByAlgorithm(algorithm);
-            displayResult(algorithm, 0, "m", false);
-            return;
-          }
-          showMessage(
-            `Calculating MST for the subset: ${activeNodesForMST
-              .map((n) => n.name)
-              .join(", ")}.`,
-            "info",
-            3000
-          );
-        } else {
-          activeNodesForMST = [...nodes];
-          operationMode = "all_nodes";
-          if (activeNodesForMST.length === 0) {
-            showMessage("No points on the map to calculate MST.", "error");
-            return;
-          }
-          if (activeNodesForMST.length < 2) {
-            showMessage(
-              "MST requires at least two points. Add more points on the map.",
-              "info"
-            );
-            if (activeNodesForMST.length === 1) {
+            if (activeNodesForMST.length < 2) {
+              showMessage(
+                `MST on subset requires at least two unique points. Found ${activeNodesForMST.length}.`,
+                "info"
+              );
               clearPathsByAlgorithm(algorithm);
               displayResult(algorithm, 0, "m", false);
+              return;
             }
-            return;
+            showMessage(
+              `Calculating MST for the subset: ${activeNodesForMST
+                .map((n) => n.name)
+                .join(", ")}.`,
+              "info",
+              3000
+            );
+          } else {
+            activeNodesForMST = [...nodes];
+            operationMode = "all_nodes";
+            if (activeNodesForMST.length === 0) {
+              showMessage("No points on the map to calculate MST.", "error");
+              return;
+            }
+            if (activeNodesForMST.length < 2) {
+              showMessage(
+                "MST requires at least two points. Add more points on the map.",
+                "info"
+              );
+              if (activeNodesForMST.length === 1) {
+                clearPathsByAlgorithm(algorithm);
+                displayResult(algorithm, 0, "m", false);
+              }
+              return;
+            }
           }
+
+          let mstEdges = null;
+          let mstWeight = 0;
+          clearPathsByAlgorithm(algorithm);
+          pathVisibilityState[algorithm] = true; // Reset visibility
+
+          switch (algorithm) {
+            case "PRIMS":
+              mstEdges = primsAlgorithm(activeNodesForMST);
+              break;
+            case "KRUSKALS":
+              mstEdges = kruskalsAlgorithm(activeNodesForMST);
+              break;
+          }
+
+          if (mstEdges && mstEdges.length > 0) {
+            mstWeight = drawMST(
+              mstEdges,
+              algorithmColors[algorithm],
+              algorithm
+            );
+            showMessage(
+              `${algorithm}'s MST calculated${
+                operationMode === "subset_nodes" ? " for the subset" : ""
+              }.`,
+              "success"
+            );
+          } else if (activeNodesForMST.length >= 2) {
+            showMessage(
+              `${algorithm}'s MST could not be formed${
+                operationMode === "subset_nodes" ? " for the subset" : ""
+              }. (e.g. not enough points for edges)`,
+              "info"
+            );
+          } else if (
+            activeNodesForMST.length === 1 &&
+            operationMode === "subset_nodes"
+          ) {
+            showMessage(
+              `${algorithm}'s MST for a single point in subset is 0.`,
+              "info"
+            );
+          }
+
+          displayResult(algorithm, mstWeight, "m", false);
+        } finally {
+          showLoadingIndicator(false);
         }
-
-        let mstEdges = null;
-        let mstWeight = 0;
-        clearPathsByAlgorithm(algorithm);
-
-        switch (algorithm) {
-          case "PRIMS":
-            mstEdges = primsAlgorithm(activeNodesForMST);
-            break;
-          case "KRUSKALS":
-            mstEdges = kruskalsAlgorithm(activeNodesForMST);
-            break;
-        }
-
-        if (mstEdges && mstEdges.length > 0) {
-          mstWeight = drawMST(mstEdges, algorithmColors[algorithm]);
-          showMessage(
-            `${algorithm}'s MST calculated${
-              operationMode === "subset_nodes" ? " for the subset" : ""
-            }.`,
-            "success"
-          );
-        } else if (activeNodesForMST.length >= 2) {
-          showMessage(
-            `${algorithm}'s MST could not be formed${
-              operationMode === "subset_nodes" ? " for the subset" : ""
-            }. (e.g. not enough points for edges)`,
-            "info"
-          );
-        } else if (
-          activeNodesForMST.length === 1 &&
-          operationMode === "subset_nodes"
-        ) {
-          showMessage(
-            `${algorithm}'s MST for a single point in subset is 0.`,
-            "info"
-          );
-        }
-
-        displayResult(algorithm, mstWeight, "m", false);
       }
 
       function primsAlgorithm(activeNodes) {
@@ -1815,7 +1985,7 @@
 
         const mstEdges = [];
         const visited = new Set();
-        const H = new PriorityQueue(); // Min-priority queue
+        const H = new PriorityQueue();
 
         const startNodeId = activeNodes[0].id;
         visited.add(startNodeId);
@@ -1857,7 +2027,6 @@
         const mstEdges = [];
         const allEdges = [];
 
-        // Create all possible edges
         for (let i = 0; i < activeNodes.length; i++) {
           for (let j = i + 1; j < activeNodes.length; j++) {
             allEdges.push({
@@ -1915,6 +2084,7 @@
         }
       }
       class PriorityQueue {
+        // Min Priority Queue
         constructor() {
           this.items = [];
         }
@@ -1937,23 +2107,23 @@
         isEmpty() {
           return this.items.length === 0;
         }
-        // These are not strictly needed for Prim's as implemented but good for a generic PQ
-        contains(element) {
-          return this.items.some(
-            (item) => JSON.stringify(item.element) === JSON.stringify(element)
-          ); // Simple comparison
-        }
+        // For Dijkstra, if we need to update priority (decrease-key)
+        // This is a simple implementation; for large graphs, a heap-based PQ is more efficient.
         updatePriority(element, newPriority) {
+          let found = false;
           for (let i = 0; i < this.items.length; i++) {
-            if (
-              JSON.stringify(this.items[i].element) === JSON.stringify(element)
-            ) {
-              // Simple comparison
+            // Assuming element is a simple ID for Dijkstra
+            if (this.items[i].element === element) {
               this.items.splice(i, 1);
-              this.enqueue(element, newPriority);
-              return;
+              found = true;
+              break;
             }
           }
+          if (found) this.enqueue(element, newPriority);
+        }
+        // Check if an element is in the queue (useful for Dijkstra)
+        contains(element) {
+          return this.items.some((item) => item.element === element);
         }
       }
 
@@ -1967,16 +2137,99 @@
           const colorToClear = algorithmColors[algorithmName];
           const layersToRemove = [];
           drawnPathLayers.eachLayer((layer) => {
-            // Check if the layer has options and a color property matching the one to clear
-            if (layer.options && layer.options.color === colorToClear) {
+            if (
+              layer.options &&
+              layer.options.color === colorToClear &&
+              layer.options.algorithmName === algorithmName
+            ) {
               layersToRemove.push(layer);
             }
           });
           layersToRemove.forEach((layer) => drawnPathLayers.removeLayer(layer));
         }
-        // Remove the result display for this algorithm
         const resultItem = document.getElementById(`result-${algorithmName}`);
         if (resultItem) resultItem.remove();
+        // Don't reset pathVisibilityState here, let runAlgorithm handle it
+      }
+
+      function togglePathVisibility(algorithmName) {
+        const isCurrentlyVisible =
+          pathVisibilityState[algorithmName] === undefined
+            ? true
+            : pathVisibilityState[algorithmName];
+        const newVisibility = !isCurrentlyVisible;
+        pathVisibilityState[algorithmName] = newVisibility;
+
+        const resultItem = document.getElementById(`result-${algorithmName}`);
+        if (resultItem) {
+          resultItem.classList.toggle("path-hidden", !newVisibility);
+        }
+
+        if (algorithmName === "ROAD_ROUTE" && lrmControl) {
+          const routingContainer = lrmControl.getContainer();
+          if (routingContainer) {
+            routingContainer.style.display = newVisibility ? "" : "none";
+          }
+          // Also toggle the actual route lines if they are separate layers
+          map.eachLayer((layer) => {
+            if (
+              layer._route &&
+              layer._route.options &&
+              layer._route.options.styles
+            ) {
+              const styleMatches = layer._route.options.styles.some(
+                (s) => s.color === algorithmColors.ROAD_ROUTE
+              );
+              if (styleMatches) {
+                if (newVisibility) {
+                  if (!map.hasLayer(layer)) map.addLayer(layer);
+                } else {
+                  if (map.hasLayer(layer)) map.removeLayer(layer);
+                }
+              }
+            }
+          });
+        } else {
+          drawnPathLayers.eachLayer((layer) => {
+            if (
+              layer.options &&
+              layer.options.algorithmName === algorithmName
+            ) {
+              if (newVisibility) {
+                if (!drawnPathLayers.hasLayer(layer))
+                  drawnPathLayers.addLayer(layer); // Should already be there
+                layer.setStyle({ opacity: 0.75 }); // Restore opacity
+                if (layer.getTooltip()) layer.openTooltip();
+              } else {
+                // Instead of removing, just make it invisible or less prominent
+                layer.setStyle({ opacity: 0 });
+                if (layer.getTooltip()) layer.closeTooltip();
+              }
+            }
+          });
+        }
+        // If hiding, ensure tooltips are also hidden. If showing, ensure they are visible.
+        drawnPathLayers.eachLayer((layer) => {
+          if (
+            layer.options &&
+            layer.options.algorithmName === algorithmName &&
+            layer.getTooltip()
+          ) {
+            if (newVisibility && pathVisibilityState[algorithmName]) {
+              layer.openTooltip();
+            } else {
+              layer.closeTooltip();
+            }
+          }
+        });
+      }
+
+      function handleResultItemClick(event) {
+        const resultItem = event.target.closest(".result-item");
+        if (resultItem && resultItem.dataset.algorithm) {
+          const algorithmName = resultItem.dataset.algorithm;
+          togglePathVisibility(algorithmName);
+        }
       }
 
       document.addEventListener("DOMContentLoaded", () => {
@@ -1985,7 +2238,7 @@
         updateModeDisplay();
         updatePointsListUI();
         updateViaPointsListUI();
-        updateAllMarkerIcons(); // Initial icon setup if any points are pre-loaded (none in this case)
+        updateAllMarkerIcons();
       });
     </script>
   </body>
